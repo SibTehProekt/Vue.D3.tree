@@ -2,6 +2,7 @@
   <div class="viewport treeclass" v-resize="resize">
   </div>
 </template>
+
 <script>
 import resize from 'vue-resize-directive'
 import euclidean from './euclidean-layout'
@@ -15,8 +16,8 @@ const layout = {
   circular
 }
 
-var i = 0
-var currentSelected = null
+let i = 0
+let currentSelected = null
 const types = ['tree', 'cluster']
 const layouts = ['circular', 'euclidean']
 
@@ -24,7 +25,7 @@ const props = {
   data: Object,
   duration: {
     type: Number,
-    default: 750
+    default: 600
   },
   type: {
     type: String,
@@ -63,6 +64,18 @@ const props = {
   radius: {
     type: Number,
     default: 3
+  },
+  grid: {
+    type: Boolean,
+    default: false
+  },
+  deep: {
+    type: Number,
+    default: 3
+  },
+  sectionsNames: {
+    type: Array,
+    default: []
   }
 }
 
@@ -82,7 +95,7 @@ function onAllChilddren (d, callback, fatherVisible = undefined) {
   if (callback(d, fatherVisible) === false) {
     return
   }
-  var directChildren = getChildren(d)
+  let directChildren = getChildren(d)
   directChildren && directChildren.children.forEach(child => onAllChilddren(child, callback, directChildren.visible))
 }
 
@@ -95,46 +108,116 @@ export default {
 
   data () {
     return {
+      sections: [],
       currentTransform: null,
       maxTextLenght: {
         first: 0,
         last: 0
-      }
+      },
+      dataDeep: 0,
+      size: {},
+      init: false
     }
   },
-
   mounted () {
-    const size = this.getSize()
+    this.size = this.getSize()
     const svg = d3.select(this.$el).append('svg')
-          .attr('width', size.width)
-          .attr('height', size.height)
+      .attr('width', this.size.width)
+      .attr('height', this.size.height)
     let g = null
     let zoom = null
 
     if (this.zoomable) {
       g = svg.append('g')
-      zoom = d3.zoom().scaleExtent([0.9, 8]).on('zoom', this.zoomed(g))
+      zoom = d3.zoom().scaleExtent([0.1, 10]).on('zoom', this.zoomed(g))
       svg.call(zoom).on('wheel', () => d3.event.preventDefault())
       svg.call(zoom.transform, d3.zoomIdentity)
     } else {
-      g = this.transformSvg(svg.append('g'), size)
+      g = this.transformSvg(svg.append('g'), this.size)
     }
 
     const tree = this.tree
-    this.internaldata = {
-      svg,
-      g,
-      tree,
-      zoom
-    }
+    this.internaldata = { svg, g, tree, zoom }
+
+    console.log(this.internaldata)
 
     this.data && this.onData(this.data)
   },
 
   methods: {
+
+    /**
+     * Отрисовка сетки для дерева
+     */
+    drawGrid () {
+      this.removeGrid()
+      for (let i = 0; i <= this.dataDeep; i++) {
+        this.sections.push({
+          line: this.internaldata.g.append('line').attr('class', 'grid-line'),
+          text: this.internaldata.g.append('text').attr('class', 'grid-text')
+        })
+      }
+
+      setTimeout(() => {
+        if (this.internaldata.g.selectAll('path').nodes().length > 1) {
+          let x = this.internaldata.g.select('path').node().getBBox().width / 2
+          let defX = x
+          let y1 = this.internaldata.g.node().getBBox().y
+          let y2 = this.internaldata.g.node().getBBox().height
+          let step = x * 2
+
+          for (let i = 0; i <= this.getDeepArray(); i++) {
+            this.sections[i].line
+              .attr('x1', x)
+              .attr('y1', y1)
+              .attr('x2', x)
+              .attr('y2', y2)
+
+            if (typeof this.sectionsNames[i] !== 'undefined') {
+              this.sections[i].text
+                .attr('dy', -13)
+                .attr('x', x - defX)
+                .attr('class', 'section-name')
+                .style('text-anchor', 'middle')
+                .text(this.sectionsNames[i])
+            }
+
+            x += step
+          }
+        }
+      }, this.duration + 150) // + 150 - чтобы анимация полностью успела завершится
+    },
+
+    removeGrid () {
+      if (this.sections.length > 0) {
+        for (let section of this.sections) {
+          section.line.remove()
+          section.text.remove()
+        }
+        this.sections = []
+      }
+    },
+
+    /**
+     * получение вложенности дерева
+     * @returns {number}
+     */
+    getDeepArray () {
+      let points = this.internaldata.g.selectAll('g').data()
+      let deep = 0
+
+      for (let point of points) {
+        if (deep < point.depth) {
+          deep = point.depth
+        }
+      }
+
+      return deep
+    },
+
     getSize () {
-      var width = this.$el.clientWidth
-      var height = this.$el.clientHeight
+      let width = this.$el.clientWidth
+      let height = this.$el.clientHeight
       return { width, height }
     },
 
@@ -170,8 +253,8 @@ export default {
       let forExit = source
       if (typeof source === 'object') {
         const origin = {x: source.x0, y: source.y0}
-        originBuilder = d => origin
-        forExit = d => ({x: source.x, y: source.y})
+        originBuilder = () => origin
+        forExit = () => ({x: source.x, y: source.y})
       }
 
       const root = this.internaldata.root
@@ -179,7 +262,18 @@ export default {
          .data(this.internaldata.tree(root).descendants().slice(1), d => d.id)
 
       const updateLinks = links.enter().append('path').attr('class', 'linktree')
-      const node = this.internaldata.g.selectAll('.nodetree').data(root.descendants(), d => d.id)
+      const node = this.internaldata.g.selectAll('.nodetree').data(root.descendants(), d => {
+        if (d.depth > this.dataDeep) {
+          this.dataDeep = d.depth
+        }
+        d.show = false
+        if ((d.children || d._children) && (d.children !== null || d._children) && d.depth === this.deep) {
+          this.collapseAll(d, false)
+          d.show = true
+        }
+        return d.id
+      })
+
       const newNodes = node.enter().append('g').attr('class', 'nodetree')
       const allNodes = newNodes.merge(node)
 
@@ -207,6 +301,7 @@ export default {
       allNodes.classed('node--internal', d => hasChildren(d))
         .classed('node--leaf', d => !hasChildren(d))
         .classed('selected', d => d === currentSelected)
+        .classed('node--internal-opened', d => d.parent === null)
         .on('click', this.onNodeClick)
 
       const allNodesPromise = toPromise(allNodes.transition().duration(this.duration)
@@ -227,7 +322,7 @@ export default {
       })
 
       const textTransition = toPromise(text.transition().duration(this.duration)
-          .attr('x', d => d.textInfo.x)
+          .attr('x', d => d.textInfo.x < 0 ? -13 : 13)
           .attr('dx', function (d) { return anchorTodx(d.textInfo.anchor, this) })
           .attr('transform', d => `rotate(${d.textInfo.rotate})`))
 
@@ -241,6 +336,10 @@ export default {
                   .attr('transform', d => translate(forExit(d), this.layout))
                   .attr('opacity', 0).remove())
       exitingNodes.select('circle').attr('r', 1e-6)
+
+      if (this.grid) {
+        this.drawGrid()
+      }
 
       const leaves = root.leaves()
       const extremeNodes = text.filter(d => leaves.indexOf(d) !== -1).nodes()
@@ -259,14 +358,16 @@ export default {
         this.transformSvg(g, size)
       }
       this.layout.size(this.internaldata.tree, size, this.margin, this.maxTextLenght)
-      return this.updateGraph(source)
+      // return this.updateGraph(source)
     },
 
     onNodeClick (d) {
-      if (d.children) {
-        this.collapse(d)
-      } else {
-        this.expand(d)
+      if (d.parent !== null) {
+        if (d.children) {
+          this.collapse(d)
+        } else {
+          this.expand(d)
+        }
       }
     },
 
@@ -279,8 +380,7 @@ export default {
       const root = d3.hierarchy(data).sort((a, b) => { return compareString(a.data.text, b.data.text) })
       this.internaldata.root = root
       root.each(d => { d.id = this.identifier(d.data) })
-      const size = this.getSize()
-      root.x = size.height / 2
+      root.x = this.size.height / 2
       root.y = 0
       root.x0 = root.x
       root.y0 = root.y
@@ -288,15 +388,15 @@ export default {
     },
 
     clean () {
-      ['.linktree', '.nodetree', 'text', 'circle'].forEach(selector => {
-        this.internaldata.g.selectAll(selector).transition().duration(this.duration).attr('opacity', 0).remove()
-      })
+      ['.linktree', '.nodetree', 'text', 'circle']
+        .forEach(selector => {
+          this.internaldata.g.selectAll(selector).transition().duration(this.duration).attr('opacity', 0).remove()
+        })
     },
 
     redraw () {
-      const root = this.internaldata.root
-      if (root) {
-        return this.updateGraph(root)
+      if (this.internaldata.root) {
+        return this.updateGraph(this.internaldata.root)
       }
       return Promise.resolve('no graph')
     },
@@ -445,6 +545,11 @@ export default {
       this.onData(current)
     },
 
+    grid () {
+      this.removeGrid()
+      this.redraw()
+    },
+
     type () {
       if (!this.internaldata.tree) {
         return
@@ -473,13 +578,32 @@ export default {
 </script>
 
 <style>
+svg {
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000;
+}
+
+svg * {
+  will-change: transform;
+}
+
+
 .treeclass .nodetree  circle {
-  fill: #999;
+  fill: rgb(255, 255, 255);
+  stroke: steelblue;
+  stroke-width: 1.5px;
 }
 
 .treeclass .node--internal circle {
   cursor: pointer;
-  fill:  #555;
+  fill:  rgb(176, 196, 222);
+}
+
+.treeclass .node--internal-opened  circle {
+  fill: rgb(255, 255, 255);
+  stroke: steelblue;
+  stroke-width: 1.5px;
 }
 
 .treeclass .nodetree text {
@@ -500,5 +624,20 @@ export default {
   stroke: #555;
   stroke-opacity: 0.4;
   stroke-width: 1.5px;
+}
+
+.node circle {
+  fill: rgb(255, 255, 255);
+  stroke: steelblue;
+  stroke-width: 1.5px;
+}
+
+svg line {
+  stroke-dasharray: 5, 10, 5;
+  stroke: #DDDDDD;
+}
+
+svg text.section-name {
+  stroke: #666666;
 }
 </style>

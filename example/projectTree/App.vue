@@ -9,13 +9,18 @@
             <div class="form-horizontal">
 
             <div class="form-group">
-              <label for="type" class="control-label col-sm-3">type</label>
-                <div  class="col-sm-9">
-                  <select id="type" class="form-control" v-model="type">
-                    <option>tree</option>
-                    <option>cluster</option>
-                  </select>
-                </div>
+              <label for="grid" class="control-label">Grid</label>
+              <input type="checkbox" id="grid" v-model="grid"/>
+            </div>
+
+            <div class="form-group">
+              <label for="layout-type" class="control-label col-sm-3">layoutType</label>
+              <div  class="col-sm-9">
+                <select id="layout-type" class="form-control" v-model="layoutType">
+                  <option>euclidean</option>
+                  <option>circular</option>
+                </select>
+              </div>
             </div>
 
             <div class="form-group">
@@ -24,29 +29,36 @@
                   <select id="layout-type" class="form-control" v-model="layoutType">
                     <option>euclidean</option>
                     <option>circular</option>
-                  </select>       
+                  </select>
               </div>
-            </div> 
+            </div>
+
+            <!--<div class="form-group">-->
+              <!--<label for="deep" class="control-label col-sm-3">Deep</label>-->
+              <!--<div class="col-sm-7">-->
+                <!--<input id="deep" class="form-control" type="number" min="2" max="6" v-model.number="deep">-->
+              <!--</div>-->
+            <!--</div>-->
 
             <div class="form-group">
               <label for="margin-x" class="control-label col-sm-3">marginx</label>
               <div class="col-sm-7">
-                <input id="margin-x" class="form-control" type="range" min="-200" max="200" v-model.number="Marginx">
-              </div> 
+                <input id="margin-x" class="form-control" type="range" min="-2000" max="2000" v-model.number="Marginx">
+              </div>
                 <div class="col-sm-2">
-                  <p>{{Marginx}}px</p>       
-              </div> 
-            </div>        
+                  <p>{{Marginx}}px</p>
+              </div>
+            </div>
 
             <div class="form-group">
               <label for="margin-y" class="control-label col-sm-3">marginy</label>
               <div class="col-sm-7">
-                <input id="margin-y" class="form-control" type="range" min="-200" max="200" v-model.number="Marginy">
+                <input id="margin-y" class="form-control" type="range" min="-5000" max="5000" v-model.number="Marginy">
               </div>
               <div class="col-sm-2">
-                <p>{{Marginy}}px</p>       
-              </div> 
-            </div>   
+                <p>{{Marginy}}px</p>
+              </div>
+            </div>
 
              <div class="form-group">
               <label for="margin-y" class="control-label col-sm-3">radius</label>
@@ -54,9 +66,9 @@
                 <input id="margin-y" class="form-control" type="range" min="1" max="10" v-model.number="radius">
               </div>
               <div class="col-sm-2">
-                <p>{{radius}}px</p>       
-              </div> 
-            </div>        
+                <p>{{radius}}px</p>
+              </div>
+            </div>
 
             <div class="form-group">
               <label for="velocity" class="control-label col-sm-3">Duration</label>
@@ -64,85 +76,101 @@
                 <input id="velocity" class="form-control" type="range" min="0" max="3000" v-model.number="duration">
               </div>
               <div class="col-sm-2">
-                <p>{{duration}}ms</p>       
+                <p>{{duration}}ms</p>
               </div>
-            </div>  
+            </div>
 
             <div class="form-group">
               <span v-if="currentNode">Current Node: {{currentNode.data.text}}</span>
               <span v-else>No Node selected.</span>
                <i v-if="isLoading" class="fa fa-spinner fa-spin fa-2x fa-fw"></i>
-            </div>  
+            </div>
 
             <button type="button" :disabled="!currentNode" class="btn btn-primary" @click="expandAll" data-toggle="tooltip" data-placement="top" title="Expand All from current">
-            <i class="fa fa-expand" aria-hidden="true"></i>          
+            <i class="fa fa-expand" aria-hidden="true"></i>
             </button>
 
             <button type="button" :disabled="!currentNode" class="btn btn-secondary" @click="collapseAll" data-toggle="tooltip" data-placement="top" title="Collapse All from current">
-            <i class="fa fa-compress" aria-hidden="true"></i>            
+            <i class="fa fa-compress" aria-hidden="true"></i>
             </button>
 
             <button type="button" :disabled="!currentNode" class="btn btn-success" @click="showOnly" data-toggle="tooltip" data-placement="top" title="Show Only from current">
-            <i class="fa fa-search-plus" aria-hidden="true"></i>       
+            <i class="fa fa-search-plus" aria-hidden="true"></i>
             </button>
 
             <button type="button" :disabled="!currentNode" class="btn btn-warning" @click="show" data-toggle="tooltip" data-placement="top" title="Show current">
-            <i class="fa fa-binoculars" aria-hidden="true"></i>           
+            <i class="fa fa-binoculars" aria-hidden="true"></i>
             </button>
 
             <button v-if="zoomable" type="button" class="btn btn-warning" @click="resetZoom" data-toggle="tooltip" data-placement="top" title="Reset Zoom">
-            <i class="fa fa-arrows-alt" aria-hidden="true"></i>                             
+            <i class="fa fa-arrows-alt" aria-hidden="true"></i>
             </button>
 
         </div>
-      </div>
-    </div>
 
+        <div class="panel panel-default">
+          <div class="panel-heading">Events</div>
 
-    <div class="panel panel-default">
-        <div class="panel-heading">Events</div>
-
-        <div class="panel-body log">
-          <div v-for="(event,index) in events" :key="index">
-            <p><b>Name:</b> {{event.eventName}} <b>Data:</b>{{event.data.text}}</p>
+          <div class="panel-body log">
+            <div v-for="(event,index) in events" :key="index">
+              <p><b>Name:</b> {{event.eventName}} <b>Data:</b>{{event.data.text}}</p>
+            </div>
           </div>
         </div>
+      </div>
     </div>
-
   </div>
 
   <div class="col-md-9 panel panel-default">
-    <tree ref="tree" :identifier="getId" :zoomable="zoomable" :data="Graph.tree" :node-text="nodeText"  :margin-x="Marginx" :margin-y="Marginy" :radius="radius" :type="type" :layout-type="layoutType" :duration="duration" class="tree" @clicked="onClick" @expand="onExpand" @retract="onRetract"/>
+    <projectTree ref="tree"
+                 :identifier="getId"
+                 :zoomable="zoomable"
+                 :data="data"
+                 :node-text="nodeText"
+                 :margin-x="Marginx"
+                 :margin-y="Marginy"
+                 :radius="radius"
+                 :type="type"
+                 :layout-type="layoutType"
+                 :duration="duration"
+                 :grid="grid"
+                 :deep="deep"
+                 :sectionsNames="['Проект', 'Сборки', 'Стадии', 'Разделы', 'Блоки', 'Задачи']"
+                 class="tree"
+                 @clicked="onClick"
+                 @expand="onExpand"
+                 @retract="onRetract"/>
   </div>
-  
+
   </div>
 </template>
 
 <script>
-import {tree} from '../../src/'
-import data from '../../data/data'
-
-Object.assign(data, {
-  type: 'tree',
-  layoutType: 'euclidean',
-  duration: 750,
-  Marginx: 30,
-  Marginy: 30,
-  radius: 5,
-  nodeText: 'text',
-  currentNode: null,
-  zoomable: true,
-  isLoading: false,
-  events: []
-})
+import {projectTree} from '../../src/'
+import data from '../../data/data_project'
 
 export default {
   name: 'app',
   data () {
-    return data
+    return {
+      type: 'tree',
+      layoutType: 'euclidean',
+      duration: 500,
+      Marginx: -500,
+      Marginy: -1000,
+      radius: 10,
+      nodeText: 'name',
+      currentNode: null,
+      zoomable: true,
+      isLoading: false,
+      events: [],
+      grid: true,
+      deep: 4,
+      data
+    }
   },
   components: {
-    tree
+    projectTree
   },
   methods: {
     do (action) {
@@ -178,7 +206,7 @@ export default {
     },
     onEvent (eventName, data) {
       this.events.push({eventName, data: data.data})
-      console.log({eventName, data: data})
+      // console.log({eventName, data: data})
     },
     resetZoom () {
       this.isLoading = true
@@ -199,17 +227,17 @@ export default {
 }
 
 .tree {
-  height: 600px;
+  height: 900px;
   width: 100%;
 }
 
 .graph-root {
-  height: 800px;
+  height: 100%;
   width: 100%;
 }
 
 .log  {
-  height: 500px;
+  height: 400px;
   overflow-x: auto;
   overflow-y: auto;
   overflow: auto;
