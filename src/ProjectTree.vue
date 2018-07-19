@@ -1,13 +1,35 @@
 <template>
-  <div class="viewport treeclass" v-resize="resize">
+  <div>
+    <svg :width="width" :height="height" v-if="render" ref="svgTree">
+      <g transform="translate(100,30) scale(1)" ref="main">
+
+        <line :x1="ln.x1" :y1="ln.y1" :x2="ln.x2" :y2="ln.y2" v-for="ln in tmp.lines" :class="ln.className"></line>
+
+        <text :x="ln.tx" :y="ln.ty" v-for="ln in tmp.lines" text-anchor="middle">{{ ln.text }}</text>
+
+        <!--<transition-group tag="g" name="line" >-->
+          <path v-for="link in links" class="link" :key="link.id" :d="link.d" :class="link.className"></path>
+        <!--</transition-group>-->
+
+        <!--<transition-group tag="g" name="list">-->
+          <g v-for="(node, index) in nodes" :key="node.id" :opacity="node.style.opacity"
+             :transform="node.style.transform" :class="node.className">
+
+            <circle :r="node.r" @click="toggleNode(index, node)"></circle>
+
+            <text :dx="node.textpos.x" :dy="node.textpos.y" :style="node.textStyle">{{ node.text }}</text>
+
+          </g>
+        <!--</transition-group>-->
+      </g>
+    </svg>
   </div>
 </template>
 
 <script>
-import resize from 'vue-resize-directive'
 import euclidean from './euclidean-layout'
 import circular from './circular-layout'
-import {compareString, anchorTodx, drawLink, toPromise, findInParents, mapMany, removeTextAndGraph, translate} from './d3-utils'
+import {compareString, toPromise, translate} from './d3-utils'
 
 import * as d3 from 'd3'
 
@@ -17,7 +39,6 @@ const layout = {
 }
 
 let i = 0
-let currentSelected = null
 const types = ['tree', 'cluster']
 const layouts = ['circular', 'euclidean']
 
@@ -33,6 +54,14 @@ const props = {
     validator (value) {
       return types.indexOf(value) !== -1
     }
+  },
+  width: {
+    type: String,
+    default: '100%'
+  },
+  height: {
+    type: String,
+    default: '100%'
   },
   layoutType: {
     type: String,
@@ -73,30 +102,14 @@ const props = {
     type: Number,
     default: 3
   },
-  sectionsNames: {
+  sections: {
     type: Array,
     default: []
+  },
+  curvature: {
+    type: Number,
+    default: 100
   }
-}
-
-const directives = {
-  resize
-}
-
-function hasChildren (d) {
-  return d.children || d._children
-}
-
-function getChildren (d) {
-  return d.children ? {children: d.children, visible: true} : (d._children ? {children: d._children, visible: false} : null)
-}
-
-function onAllChilddren (d, callback, fatherVisible = undefined) {
-  if (callback(d, fatherVisible) === false) {
-    return
-  }
-  let directChildren = getChildren(d)
-  directChildren && directChildren.children.forEach(child => onAllChilddren(child, callback, directChildren.visible))
 }
 
 export default {
@@ -104,115 +117,62 @@ export default {
 
   props,
 
-  directives,
-
   data () {
     return {
-      sections: [],
+      innerData: this.data,
+      depth: 0,
       currentTransform: null,
       maxTextLenght: {
         first: 0,
         last: 0
       },
       dataDeep: 0,
-      size: {},
-      init: false
+      render: false,
+      zoom: {
+        min: 0.1,
+        max: 10
+      },
+      tree: null,
+      tmp: {
+        hide: [],
+        lines: []
+      }
     }
   },
+  beforeMount () {
+    this.childrenExist(this.innerData)
+  },
+  updated: function () {
+    this.$nextTick(function () {
+      this.tmp.lines = this.lines
+    })
+  },
   mounted () {
-    this.size = this.getSize()
-    const svg = d3.select(this.$el).append('svg')
-      .attr('width', this.size.width)
-      .attr('height', this.size.height)
-    let g = null
-    let zoom = null
+    const size = this.getSize()
+    const tree = d3.tree()
+    this.layout.size(tree, size, this.margin, this.maxTextLenght)
+    this.tree = tree
 
-    if (this.zoomable) {
-      g = svg.append('g')
-      zoom = d3.zoom().scaleExtent([0.1, 10]).on('zoom', this.zoomed(g))
-      svg.call(zoom).on('wheel', () => d3.event.preventDefault())
-      svg.call(zoom.transform, d3.zoomIdentity)
-    } else {
-      g = this.transformSvg(svg.append('g'), this.size)
-    }
-
-    const tree = this.tree
-    this.internaldata = { svg, g, tree, zoom }
-
-    console.log(this.internaldata)
-
-    this.data && this.onData(this.data)
+    this.$nextTick(() => {
+      this.render = !this.render
+      this.$nextTick(() => {
+        const svg = d3.select(this.$refs.svgTree)
+        let zoom = d3.zoom().scaleExtent([this.zoom.min, this.zoom.max]).on('zoom', this.zoomed(svg.select('g')))
+        svg.call(zoom).on('wheel', () => d3.event.preventDefault())
+        svg.call(zoom.transform, d3.zoomIdentity)
+        this.tmp.lines = this.lines
+      })
+    })
   },
 
   methods: {
-
-    /**
-     * Отрисовка сетки для дерева
-     */
-    drawGrid () {
-      this.removeGrid()
-      for (let i = 0; i <= this.dataDeep; i++) {
-        this.sections.push({
-          line: this.internaldata.g.append('line').attr('class', 'grid-line'),
-          text: this.internaldata.g.append('text').attr('class', 'grid-text')
-        })
-      }
-
-      setTimeout(() => {
-        if (this.internaldata.g.selectAll('path').nodes().length > 1) {
-          let x = this.internaldata.g.select('path').node().getBBox().width / 2
-          let defX = x
-          let y1 = this.internaldata.g.node().getBBox().y
-          let y2 = this.internaldata.g.node().getBBox().height
-          let step = x * 2
-
-          for (let i = 0; i <= this.getDeepArray(); i++) {
-            this.sections[i].line
-              .attr('x1', x)
-              .attr('y1', y1)
-              .attr('x2', x)
-              .attr('y2', y2)
-
-            if (typeof this.sectionsNames[i] !== 'undefined') {
-              this.sections[i].text
-                .attr('dy', -13)
-                .attr('x', x - defX)
-                .attr('class', 'section-name')
-                .style('text-anchor', 'middle')
-                .text(this.sectionsNames[i])
-            }
-
-            x += step
-          }
-        }
-      }, this.duration + 150) // + 150 - чтобы анимация полностью успела завершится
-    },
-
-    removeGrid () {
-      if (this.sections.length > 0) {
-        for (let section of this.sections) {
-          section.line.remove()
-          section.text.remove()
-        }
-        this.sections = []
-      }
-    },
-
-    /**
-     * получение вложенности дерева
-     * @returns {number}
-     */
-    getDeepArray () {
-      let points = this.internaldata.g.selectAll('g').data()
-      let deep = 0
-
-      for (let point of points) {
-        if (deep < point.depth) {
-          deep = point.depth
+    childrenExist (dataNode) {
+      dataNode.childrenExist = (typeof dataNode.children !== 'undefined')
+      if (typeof dataNode.children !== 'undefined' && Array.isArray(dataNode.children)) {
+        for (let child of dataNode.children) {
+          this.childrenExist(child)
         }
       }
-
-      return deep
     },
 
     getSize () {
@@ -221,144 +181,9 @@ export default {
       return { width, height }
     },
 
-    resize () {
-      const size = this.getSize()
-      this.internaldata.svg
-              .attr('width', size.width)
-              .attr('height', size.height)
-      this.layout.size(this.internaldata.tree, size, this.margin, this.maxTextLenght)
-      this.applyZoom(size)
-      this.redraw()
-    },
-
-    completeRedraw ({margin = null, layout = null}) {
-      const size = this.getSize()
-      this.layout.size(this.internaldata.tree, size, this.margin, this.maxTextLenght)
-      this.applyTransition(size, {margin, layout})
-      this.redraw()
-    },
-
-    transformSvg (g, size) {
-      size = size || this.getSize()
-      return this.layout.transformSvg(g, this.margin, size, this.maxTextLenght)
-    },
-
     updateTransform (g, size) {
       size = size || this.getSize()
       return this.layout.updateTransform(g, this.margin, size, this.maxTextLenght)
-    },
-
-    updateGraph (source) {
-      let originBuilder = source
-      let forExit = source
-      if (typeof source === 'object') {
-        const origin = {x: source.x0, y: source.y0}
-        originBuilder = () => origin
-        forExit = () => ({x: source.x, y: source.y})
-      }
-
-      const root = this.internaldata.root
-      const links = this.internaldata.g.selectAll('.linktree')
-         .data(this.internaldata.tree(root).descendants().slice(1), d => d.id)
-
-      const updateLinks = links.enter().append('path').attr('class', 'linktree')
-      const node = this.internaldata.g.selectAll('.nodetree').data(root.descendants(), d => {
-        if (d.depth > this.dataDeep) {
-          this.dataDeep = d.depth
-        }
-        d.show = false
-        if ((d.children || d._children) && (d.children !== null || d._children) && d.depth === this.deep) {
-          this.collapseAll(d, false)
-          d.show = true
-        }
-        return d.id
-      })
-
-      const newNodes = node.enter().append('g').attr('class', 'nodetree')
-      const allNodes = newNodes.merge(node)
-
-      removeTextAndGraph(node)
-
-      const text = allNodes.append('text')
-        .attr('dy', '.35em')
-        .text(d => d.data[this.nodeText])
-        .on('click', d => {
-          currentSelected = (currentSelected === d) ? null : d
-          d3.event.stopPropagation()
-          this.redraw()
-          this.$emit('clicked', {element: d, data: d.data})
-        })
-
-      updateLinks.attr('d', d => drawLink(originBuilder(d), originBuilder(d), this.layout))
-
-      const updateAndNewLinks = links.merge(updateLinks)
-      const updateAndNewLinksPromise = toPromise(updateAndNewLinks.transition().duration(this.duration).attr('d', d => drawLink(d, d.parent, this.layout)))
-
-      const exitingLinksPromise = toPromise(links.exit().transition().duration(this.duration).attr('d', d => drawLink(forExit(d), forExit(d), this.layout)).remove())
-
-      newNodes.attr('transform', d => translate(originBuilder(d), this.layout))
-
-      allNodes.classed('node--internal', d => hasChildren(d))
-        .classed('node--leaf', d => !hasChildren(d))
-        .classed('selected', d => d === currentSelected)
-        .classed('node--internal-opened', d => d.parent === null)
-        .on('click', this.onNodeClick)
-
-      const allNodesPromise = toPromise(allNodes.transition().duration(this.duration)
-        .attr('transform', d => translate(d, this.layout))
-        .attr('opacity', 1))
-
-      allNodes
-        .append('circle')
-        .attr('r', this.radius)
-
-      text.attr('x', d => { return d.textInfo ? d.textInfo.x : 0 })
-          .attr('dx', function (d) { return d.textInfo ? anchorTodx(d.textInfo.anchor, this) : 0 })
-          .attr('transform', d => 'rotate(' + (d.textInfo ? d.textInfo.rotate : 0) + ')')
-
-      const {transformText} = this.layout
-      allNodes.each((d) => {
-        d.textInfo = transformText(d, hasChildren(d))
-      })
-
-      const textTransition = toPromise(text.transition().duration(this.duration)
-          .attr('x', d => d.textInfo.x < 0 ? -13 : 13)
-          .attr('dx', function (d) { return anchorTodx(d.textInfo.anchor, this) })
-          .attr('transform', d => `rotate(${d.textInfo.rotate})`))
-
-      allNodes.each((d) => {
-        d.x0 = d.x
-        d.y0 = d.y
-      })
-
-      const exitingNodes = node.exit()
-      const exitingNodesPromise = toPromise(exitingNodes.transition().duration(this.duration)
-                  .attr('transform', d => translate(forExit(d), this.layout))
-                  .attr('opacity', 0).remove())
-      exitingNodes.select('circle').attr('r', 1e-6)
-
-      if (this.grid) {
-        this.drawGrid()
-      }
-
-      const leaves = root.leaves()
-      const extremeNodes = text.filter(d => leaves.indexOf(d) !== -1).nodes()
-      const last = Math.max(...extremeNodes.map(node => node.getComputedTextLength())) + 6
-      const first = text.node().getComputedTextLength() + 6
-      if (last <= this.maxTextLenght.last && first <= this.maxTextLenght.first) {
-        return Promise.all([allNodesPromise, exitingNodesPromise, textTransition, updateAndNewLinksPromise, exitingLinksPromise])
-      }
-
-      this.maxTextLenght = {first, last}
-      const size = this.getSize()
-      if (this.zoomable) {
-        this.internaldata.svg.call(this.internaldata.zoom.transform, this.currentTransform)
-      } else {
-        const {g} = this.internaldata
-        this.transformSvg(g, size)
-      }
-      this.layout.size(this.internaldata.tree, size, this.margin, this.maxTextLenght)
-      // return this.updateGraph(source)
     },
 
     onNodeClick (d) {
@@ -368,70 +193,6 @@ export default {
         } else {
           this.expand(d)
         }
-      }
-    },
-
-    onData (data) {
-      if (!data) {
-        this.internaldata.root = null
-        this.clean()
-        return
-      }
-      const root = d3.hierarchy(data).sort((a, b) => { return compareString(a.data.text, b.data.text) })
-      this.internaldata.root = root
-      root.each(d => { d.id = this.identifier(d.data) })
-      root.x = this.size.height / 2
-      root.y = 0
-      root.x0 = root.x
-      root.y0 = root.y
-      this.redraw()
-    },
-
-    clean () {
-      ['.linktree', '.nodetree', 'text', 'circle']
-        .forEach(selector => {
-          this.internaldata.g.selectAll(selector).transition().duration(this.duration).attr('opacity', 0).remove()
-        })
-    },
-
-    redraw () {
-      if (this.internaldata.root) {
-        return this.updateGraph(this.internaldata.root)
-      }
-      return Promise.resolve('no graph')
-    },
-
-    getNodeOriginComputer (originalVisibleNodes) {
-      return node => {
-        const parentVisible = findInParents(node, originalVisibleNodes)
-        return {x: parentVisible.x0, y: parentVisible.y0}
-      }
-    },
-
-    applyZoom (size) {
-      const {g, zoom} = this.internaldata
-      if (this.zoomable) {
-        g.call(zoom.transform, this.currentTransform)
-      } else {
-        this.transformSvg(g, size)
-      }
-    },
-
-    applyTransition (size, {margin, layout}) {
-      const {g, svg, zoom} = this.internaldata
-      if (this.zoomable) {
-        const transform = this.currentTransform
-        const oldMargin = margin || this.margin
-        const oldLayout = layout || this.layout
-
-        const nowTransform = oldLayout.updateTransform(transform, oldMargin, size, this.maxTextLenght)
-        const nextRealTransform = this.updateTransform(transform, size)
-        const current = d3.zoomIdentity.translate(transform.x + nowTransform.x - nextRealTransform.x, transform.y + nowTransform.y - nextRealTransform.y).scale(transform.k)
-
-        svg.call(zoom.transform, current).transition().duration(this.duration).call(zoom.transform, transform)
-      } else {
-        const transitiong = g.transition().duration(this.duration)
-        this.transformSvg(transitiong, size)
       }
     },
 
@@ -446,73 +207,6 @@ export default {
       }
     },
 
-    updateIfNeeded (d, update) {
-      return update ? this.updateGraph(d).then(() => true) : Promise.resolve(true)
-    },
-
-    // API
-    collapse (d, update = true) {
-      if (!d.children) {
-        return Promise.resolve(false)
-      }
-
-      d._children = d.children
-      d.children = null
-      this.$emit('retract', {element: d, data: d.data})
-      return this.updateIfNeeded(d, update)
-    },
-
-    expand (d, update = true) {
-      if (!d._children) {
-        return Promise.resolve(false)
-      }
-
-      d.children = d._children
-      d._children = null
-      this.$emit('expand', {element: d, data: d.data})
-      return this.updateIfNeeded(d, update)
-    },
-
-    expandAll (d, update = true) {
-      const lastVisible = d.leaves()
-      onAllChilddren(d, child => { this.expand(child, false) })
-      return this.updateIfNeeded(this.getNodeOriginComputer(lastVisible), update)
-    },
-
-    collapseAll (d, update = true) {
-      onAllChilddren(d, child => this.collapse(child, false))
-      return this.updateIfNeeded(d, update)
-    },
-
-    show (d, update = true) {
-      const path = d.ancestors().reverse()
-      const root = path.find(node => node.children === null) || d
-      path.forEach(node => this.expand(node, false))
-      return this.updateIfNeeded(root, update)
-    },
-
-    showOnly (d) {
-      const root = this.internaldata.root
-      const path = d.ancestors().reverse()
-      const shouldBeRetracted = mapMany(path, p => p.children ? p.children : []).filter(node => node && (path.indexOf(node) === -1))
-      const mapped = {}
-      shouldBeRetracted.filter(node => node.children)
-                      .forEach(rectractedNode => rectractedNode.each(c => { mapped[c.id] = rectractedNode }))
-      const origin = node => {
-        const reference = mapped[node.id]
-        return {x: reference.x, y: reference.y}
-      }
-      const updater = node => {
-        if (shouldBeRetracted.indexOf(node) !== -1) {
-          this.collapse(node, false)
-          return false
-        }
-        return (node !== d)
-      }
-      onAllChilddren(root, updater)
-      return this.updateGraph(origin).then(() => true)
-    },
-
     resetZoom () {
       if (!this.zoomable) {
         return Promise.resolve(false)
@@ -520,17 +214,116 @@ export default {
       const {svg, zoom} = this.internaldata
       const transitionPromise = toPromise(svg.transition().duration(this.duration).call(zoom.transform, () => d3.zoomIdentity))
       return transitionPromise.then(() => true)
+    },
+
+    toggleNode (index, node) {
+      let dataNode = this.searchNode(this.innerData, node.id)
+      if (dataNode.children !== null) {
+        dataNode._children = dataNode.children
+        dataNode.children = null
+      } else {
+        dataNode.children = dataNode._children
+        dataNode._children = null
+      }
+    },
+    searchNode (dataNode, id) {
+      if (dataNode.id === id) {
+        return dataNode
+      }
+      if (typeof dataNode.children !== 'undefined' && Array.isArray(dataNode.children)) {
+        for (let child of dataNode.children) {
+          let res = this.searchNode(child, id)
+          if (res !== null) {
+            return res
+          }
+        }
+      }
+      return null
+    },
+    select: (index, node) => {
+      this.selected = index
     }
   },
 
   computed: {
-    tree () {
-      const size = this.getSize()
-      const tree = this.type === 'cluster' ? d3.cluster() : d3.tree()
-      this.layout.size(tree, size, this.margin, this.maxTextLenght)
-      return tree
+    root () {
+      if (this.innerData) {
+        return this.tree(d3.hierarchy(this.innerData).sort((a, b) => {
+          return compareString(a.data.text, b.data.text)
+        }))
+      }
+      return null
     },
-
+    nodes () {
+      if (this.root) {
+        this.depth = 0
+        return this.root.descendants().map(d => {
+          if (this.depth < d.depth) {
+            this.depth = d.depth
+          }
+          return {
+            id: d.data.id,
+            r: this.radius,
+            className: 'nodetree' +
+              (d.children && d.children !== null ? ' node--internal-opened' : ' node--internal-closed') +
+              (!d.data.childrenExist || d.parent === null ? ' node--notclick' : ''),
+            text: d.data.name,
+            style: {
+              transform: translate(d, this.layout),
+              opacity: 1
+            },
+            textpos: {
+              x: d.children ? -13 : 13,
+              y: 3
+            },
+            textStyle: {
+              textAnchor: d.children ? 'end' : 'start'
+            }
+          }
+        })
+      }
+    },
+    links () {
+      if (this.root) {
+        return this.root.descendants().slice(1).map((d) => {
+          let y1 = d.y
+          let x1 = d.x
+          let y2 = d.parent.y + this.curvature
+          let x2 = d.x
+          let y3 = d.parent.y + this.curvature
+          let x3 = d.parent.x
+          let y4 = d.parent.y
+          let x4 = d.parent.x
+          return {
+            id: `link${d.data.id}`,
+            d: `M${y1},${x1} C ${y2},${x2} ${y3},${x3} ${y4},${x4}`,
+            className: 'linktree'
+          }
+        })
+      }
+    },
+    lines () {
+      if (this.nodes && this.$refs.main) {
+        let lines = []
+        let w = d3.select(this.$refs.main).select('path').node().getBBox().width
+        let x = w / 2
+        for (let i = 0; i <= this.depth; i++) {
+          lines.push({
+            tx: x - (w / 2),
+            ty: -25,
+            text: this.sections[i],
+            x1: x,
+            y1: -30,
+            x2: x,
+            y2: this.$refs.main.getBBox().height + 30,
+            className: 'linktree'
+          })
+          x += w
+        }
+        return lines
+      }
+      return []
+    },
     margin () {
       return {x: this.marginX, y: this.marginY}
     },
@@ -543,6 +336,10 @@ export default {
   watch: {
     data (current, old) {
       this.onData(current)
+    },
+
+    rendered () {
+      console.log(this.lines)
     },
 
     grid () {
@@ -588,22 +385,28 @@ svg * {
   will-change: transform;
 }
 
-
 .treeclass .nodetree  circle {
   fill: rgb(255, 255, 255);
   stroke: steelblue;
   stroke-width: 1.5px;
 }
 
-.treeclass .node--internal circle {
-  cursor: pointer;
-  fill:  rgb(176, 196, 222);
+.treeclass .node--notclick circle {
+  cursor: default !important;
 }
 
 .treeclass .node--internal-opened  circle {
   fill: rgb(255, 255, 255);
-  stroke: steelblue;
-  stroke-width: 1.5px;
+  cursor: pointer;
+}
+
+.treeclass .node--internal-closed circle {
+  fill:  rgb(176, 196, 222);
+  cursor: pointer;
+}
+
+.treeclass .nodetree {
+  /*transition: all 1s;*/
 }
 
 .treeclass .nodetree text {
@@ -624,6 +427,7 @@ svg * {
   stroke: #555;
   stroke-opacity: 0.4;
   stroke-width: 1.5px;
+  /*transition: all 1s;*/
 }
 
 .node circle {

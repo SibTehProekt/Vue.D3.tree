@@ -135,8 +135,8 @@
                  :duration="duration"
                  :grid="grid"
                  :deep="deep"
-                 :sectionsNames="['Проект', 'Сборки', 'Стадии', 'Разделы', 'Блоки', 'Задачи']"
-                 class="tree"
+                 :sections="['Проект', 'Сборки', 'Стадии', 'Разделы', 'Блоки', 'Задачи']"
+                 class="viewport treeclass tree"
                  @clicked="onClick"
                  @expand="onExpand"
                  @retract="onRetract"/>
@@ -156,8 +156,8 @@ export default {
       type: 'tree',
       layoutType: 'euclidean',
       duration: 500,
-      Marginx: -500,
-      Marginy: -1000,
+      Marginx: -100,
+      Marginy: -100,
       radius: 10,
       nodeText: 'name',
       currentNode: null,
