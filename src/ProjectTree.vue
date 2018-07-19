@@ -4,7 +4,6 @@
       <g transform="translate(100,30) scale(1)" ref="main">
 
         <line :x1="ln.x1" :y1="ln.y1" :x2="ln.x2" :y2="ln.y2" v-for="ln in tmp.lines" :class="ln.className"></line>
-
         <text :x="ln.tx" :y="ln.ty" v-for="ln in tmp.lines" text-anchor="middle">{{ ln.text }}</text>
 
         <!--<transition-group tag="g" name="line" >-->
@@ -78,6 +77,10 @@ const props = {
     type: Number,
     default: 20
   },
+  autoMargin: {
+    type: Boolean,
+    default: false
+  },
   nodeText: {
     type: String,
     required: true
@@ -106,17 +109,15 @@ const props = {
     type: Array,
     default: []
   },
-  curvature: {
-    type: Number,
-    default: 100
+  isNotHideDefaultNode: {
+    type: Boolean,
+    default: false
   }
 }
 
 export default {
   name: 'D3Tree',
-
   props,
-
   data () {
     return {
       innerData: this.data,
@@ -134,13 +135,12 @@ export default {
       },
       tree: null,
       tmp: {
-        hide: [],
         lines: []
       }
     }
   },
   beforeMount () {
-    this.childrenExist(this.innerData)
+    this.addFields(this.innerData)
   },
   updated: function () {
     this.$nextTick(function () {
@@ -148,11 +148,7 @@ export default {
     })
   },
   mounted () {
-    const size = this.getSize()
-    const tree = d3.tree()
-    this.layout.size(tree, size, this.margin, this.maxTextLenght)
-    this.tree = tree
-
+    this.tree = this.initLayout()
     this.$nextTick(() => {
       this.render = !this.render
       this.$nextTick(() => {
@@ -166,26 +162,36 @@ export default {
   },
 
   methods: {
-    childrenExist (dataNode) {
+    initLayout () {
+      const size = this.getSize()
+      const tree = d3.tree()
+      this.layout.size(tree, size, this.margin, this.maxTextLenght)
+      return tree
+    },
+    addFields (dataNode, deep = 0) {
       dataNode.childrenExist = (typeof dataNode.children !== 'undefined')
+      dataNode.clicking = this.isNotHideDefaultNode && this.deep <= deep
+      dataNode.deep = deep
       if (typeof dataNode.children !== 'undefined' && Array.isArray(dataNode.children)) {
+        deep++
         for (let child of dataNode.children) {
-          this.childrenExist(child)
+          this.addFields(child, deep)
         }
       }
+      if (this.deep < deep) {
+        dataNode._children = dataNode.children
+        dataNode.children = null
+      }
     },
-
     getSize () {
       let width = this.$el.clientWidth
       let height = this.$el.clientHeight
       return { width, height }
     },
-
     updateTransform (g, size) {
       size = size || this.getSize()
       return this.layout.updateTransform(g, this.margin, size, this.maxTextLenght)
     },
-
     onNodeClick (d) {
       if (d.parent !== null) {
         if (d.children) {
@@ -195,7 +201,6 @@ export default {
         }
       }
     },
-
     zoomed (g) {
       return () => {
         const transform = d3.event.transform
@@ -206,7 +211,6 @@ export default {
         g.attr('transform', transformToApply)
       }
     },
-
     resetZoom () {
       if (!this.zoomable) {
         return Promise.resolve(false)
@@ -215,15 +219,16 @@ export default {
       const transitionPromise = toPromise(svg.transition().duration(this.duration).call(zoom.transform, () => d3.zoomIdentity))
       return transitionPromise.then(() => true)
     },
-
     toggleNode (index, node) {
-      let dataNode = this.searchNode(this.innerData, node.id)
-      if (dataNode.children !== null) {
-        dataNode._children = dataNode.children
-        dataNode.children = null
-      } else {
-        dataNode.children = dataNode._children
-        dataNode._children = null
+      if (node.deep >= this.deep) {
+        let dataNode = this.searchNode(this.innerData, node.id)
+        if (dataNode.children !== null) {
+          dataNode._children = dataNode.children
+          dataNode.children = null
+        } else {
+          dataNode.children = dataNode._children
+          dataNode._children = null
+        }
       }
     },
     searchNode (dataNode, id) {
@@ -266,8 +271,9 @@ export default {
             r: this.radius,
             className: 'nodetree' +
               (d.children && d.children !== null ? ' node--internal-opened' : ' node--internal-closed') +
-              (!d.data.childrenExist || d.parent === null ? ' node--notclick' : ''),
+              (!d.data.childrenExist || d.parent === null || (this.isNotHideDefaultNode && !d.data.clicking) ? ' node--notclick' : ''),
             text: d.data.name,
+            deep: d.data.deep,
             style: {
               transform: translate(d, this.layout),
               opacity: 1
@@ -288,9 +294,9 @@ export default {
         return this.root.descendants().slice(1).map((d) => {
           let y1 = d.y
           let x1 = d.x
-          let y2 = d.parent.y + this.curvature
+          let y2 = d.parent.y + (d.y - d.parent.y) / 2
           let x2 = d.x
-          let y3 = d.parent.y + this.curvature
+          let y3 = d.parent.y + (d.y - d.parent.y) / 2
           let x3 = d.parent.x
           let y4 = d.parent.y
           let x4 = d.parent.x
@@ -338,15 +344,6 @@ export default {
       this.onData(current)
     },
 
-    rendered () {
-      console.log(this.lines)
-    },
-
-    grid () {
-      this.removeGrid()
-      this.redraw()
-    },
-
     type () {
       if (!this.internaldata.tree) {
         return
@@ -355,12 +352,14 @@ export default {
       this.redraw()
     },
 
-    marginX (newMarginX, oldMarginX) {
-      this.completeRedraw({margin: {x: oldMarginX, y: this.marginY}})
+    marginX () {
+      this.tmp.lines = this.lines
+      this.tree = this.initLayout()
     },
 
-    marginY (newMarginY, oldMarginY) {
-      this.completeRedraw({margin: {x: this.marginX, y: oldMarginY}})
+    marginY () {
+      this.tmp.lines = this.lines
+      this.tree = this.initLayout()
     },
 
     layout (newLayout, oldLayout) {

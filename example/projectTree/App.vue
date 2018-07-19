@@ -129,12 +129,14 @@
                  :node-text="nodeText"
                  :margin-x="Marginx"
                  :margin-y="Marginy"
+                 :autoMargin="true"
                  :radius="radius"
                  :type="type"
                  :layout-type="layoutType"
                  :duration="duration"
                  :grid="grid"
                  :deep="deep"
+                 :isNotHideDefaultNode="true"
                  :sections="['Проект', 'Сборки', 'Стадии', 'Разделы', 'Блоки', 'Задачи']"
                  class="viewport treeclass tree"
                  @clicked="onClick"
@@ -165,7 +167,7 @@ export default {
       isLoading: false,
       events: [],
       grid: true,
-      deep: 4,
+      deep: 2,
       data
     }
   },
