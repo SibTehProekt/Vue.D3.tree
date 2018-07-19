@@ -122,12 +122,10 @@ export default {
     return {
       innerData: this.data,
       depth: 0,
-      currentTransform: null,
       maxTextLenght: {
         first: 0,
         last: 0
       },
-      dataDeep: 0,
       render: false,
       zoom: {
         min: 0.1,
@@ -206,7 +204,6 @@ export default {
         const transform = d3.event.transform
         const size = this.getSize()
         const transformToApply = this.updateTransform(transform, size)
-        this.currentTransform = transform
         this.$emit('zoom', {transform})
         g.attr('transform', transformToApply)
       }
