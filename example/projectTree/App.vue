@@ -9,6 +9,11 @@
             <div class="form-horizontal">
 
             <div class="form-group">
+              <label for="clickable" class="control-label">Clickable deep nodes</label>
+              <input type="checkbox" id="clickable" v-model="clickableDefaultNodes"/>
+            </div>
+
+            <div class="form-group">
               <label for="hideDeepNodes" class="control-label">Hide deep nodes</label>
               <input type="checkbox" id="hideDeepNodes" v-model="hideDeepNodes"/>
             </div>
@@ -153,6 +158,8 @@
                  :grid="grid"
                  :deep="(deep < 1 ? 1 : deep)"
                  :hideDeepNodes="hideDeepNodes"
+                 :gridMarginY="gridMarginY"
+                 :clickableDefaultNodes="clickableDefaultNodes"
                  :sections="['Проект', 'Сборки', 'Стадии', 'Разделы', 'Блоки', 'Задачи']"
                  class="viewport treeclass tree"
                  @clicked="onClick"
@@ -187,6 +194,8 @@ export default {
       events: [],
       grid: true,
       deep: 2,
+      gridMarginY: 50,
+      clickableDefaultNodes: false,
       data
     }
   },

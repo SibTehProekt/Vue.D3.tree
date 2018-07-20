@@ -129,6 +129,14 @@ const props = {
   zoomMin: {
     type: Number,
     default: 0.1
+  },
+  gridMarginY: {
+    type: Number,
+    default: 50
+  },
+  clickableDefaultNodes: {
+    type: Boolean,
+    default: true
   }
 }
 
@@ -149,6 +157,10 @@ export default {
         lines: [],
         automargin: {
           counter: []
+        },
+        position: {
+          y1: 0,
+          y2: 100
         }
       },
       minMargin: 100
@@ -159,7 +171,7 @@ export default {
   },
   updated: function () {
     this.$nextTick(function () {
-      this.tmp.lines = this.lines
+      this.updateLines()
     })
   },
   mounted () {
@@ -173,7 +185,7 @@ export default {
           svg.call(zoom).on('wheel', () => d3.event.preventDefault())
           svg.call(zoom.transform, d3.zoomIdentity)
         }
-        this.tmp.lines = this.lines
+        this.updateLines()
       })
     })
   },
@@ -181,6 +193,9 @@ export default {
   methods: {
     update () {
       this.tree = this.initLayout()
+    },
+    updateLines () {
+      this.tmp.lines = this.lines
     },
     upgrade () {
       this.innerData = cloneDeep(this.data)
@@ -246,14 +261,15 @@ export default {
       if (!this.zoomable) {
         return Promise.resolve(false)
       }
-      const {svg, zoom} = this.internaldata
+      const svg = d3.select(this.$refs.svgTree)
+      let zoom = d3.zoom().scaleExtent([this.zoomMin, this.zoomMax]).on('zoom', this.zoomed(svg.select('g')))
       const transitionPromise = toPromise(
         svg.transition().duration(this.duration).call(zoom.transform, () => d3.zoomIdentity)
       )
       return transitionPromise.then(() => true)
     },
     toggleNode (index, node) {
-      if (node.deep >= this.deep && node.childrenExist) {
+      if ((this.clickableDefaultNodes || node.deep >= this.deep) && node.childrenExist && node.parentExist) {
         let dataNode = this.searchNode(this.innerData, node.id)
         if (dataNode.children !== null) {
           this.tmp.automargin.counter[dataNode.deep + 1] -= dataNode.children.length
@@ -347,6 +363,7 @@ export default {
             r: this.radius,
             className: className,
             childrenExist: d.data.childrenExist,
+            parentExist: d.parent !== null,
             text: d.data.name,
             deep: d.data.deep,
             style: {
@@ -389,16 +406,23 @@ export default {
         let lines = []
         let w = mainEl.select('path').node().getBBox().width
         let x = w / 2
-        let {y, height} = mainEl.node().getBBox()
+        let y1 = null
+        let y2 = 0
+        for (let node of mainEl.selectAll('path').nodes()) {
+          let box = node.getBBox()
+          if (y1 === null || y1 > box.y) y1 = box.y
+          let y = box.y + box.height
+          if (y1 < y) y2 = y
+        }
         for (let i = 0; i <= this.depth; i++) {
           lines.push({
             tx: x - (w / 2),
-            ty: y,
+            ty: y1 - this.gridMarginY,
             text: this.sections[i],
             x1: x,
-            y1: y,
+            y1: y1 - this.gridMarginY,
             x2: x,
-            y2: height,
+            y2: y2 + this.gridMarginY,
             className: 'linktree'
           })
           x += w
@@ -422,7 +446,7 @@ export default {
     },
 
     grid () {
-      this.tmp.lines = this.lines
+      this.updateLines()
     },
 
     autoMarginX () {
@@ -434,12 +458,12 @@ export default {
     },
 
     marginX () {
-      this.tmp.lines = this.lines
+      this.updateLines()
       this.update()
     },
 
     marginY () {
-      this.tmp.lines = this.lines
+      this.updateLines()
       this.update()
     },
 
