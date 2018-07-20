@@ -9,8 +9,23 @@
             <div class="form-horizontal">
 
             <div class="form-group">
+              <label for="isNotHideDefaultNode" class="control-label">Fix nodes by default</label>
+              <input type="checkbox" id="isNotHideDefaultNode" v-model="isNotHideDefaultNode"/>
+            </div>
+
+            <div class="form-group">
               <label for="grid" class="control-label">Grid</label>
               <input type="checkbox" id="grid" v-model="grid"/>
+            </div>
+
+            <div class="form-group">
+              <label for="type" class="control-label col-sm-3">type</label>
+              <div  class="col-sm-9">
+                <select id="type" class="form-control" v-model="type">
+                  <option>tree</option>
+                  <option>cluster</option>
+                </select>
+              </div>
             </div>
 
             <div class="form-group">
@@ -24,26 +39,21 @@
             </div>
 
             <div class="form-group">
-              <label for="layout-type" class="control-label col-sm-3">layoutType</label>
-                <div  class="col-sm-9">
-                  <select id="layout-type" class="form-control" v-model="layoutType">
-                    <option>euclidean</option>
-                    <option>circular</option>
-                  </select>
+              <label for="deep" class="control-label col-sm-3">Deep</label>
+              <div class="col-sm-7">
+                <input id="deep" class="form-control" type="number" min="2" max="6" v-model.number="deep">
               </div>
             </div>
 
-            <!--<div class="form-group">-->
-              <!--<label for="deep" class="control-label col-sm-3">Deep</label>-->
-              <!--<div class="col-sm-7">-->
-                <!--<input id="deep" class="form-control" type="number" min="2" max="6" v-model.number="deep">-->
-              <!--</div>-->
-            <!--</div>-->
-
             <div class="form-group">
-              <label for="margin-x" class="control-label col-sm-3">marginx</label>
+              <label for="automarginx" class="control-label">Automargin X</label>
+              <input type="checkbox" id="automarginx" v-model="autoMarginX"/>
+            </div>
+
+            <div class="form-group" v-show="!autoMarginX">
+              <label for="marginx" class="control-label col-sm-3">marginx</label>
               <div class="col-sm-7">
-                <input id="margin-x" class="form-control" type="range" min="-2000" max="2000" v-model.number="Marginx">
+                <input id="marginx" class="form-control" type="range" min="-2000" max="2000" v-model.number="Marginx">
               </div>
                 <div class="col-sm-2">
                   <p>{{Marginx}}px</p>
@@ -51,9 +61,14 @@
             </div>
 
             <div class="form-group">
-              <label for="margin-y" class="control-label col-sm-3">marginy</label>
+              <label for="automarginy" class="control-label">Automargin Y</label>
+              <input type="checkbox" id="automarginy" v-model="autoMarginY"/>
+            </div>
+
+            <div class="form-group" v-show="!autoMarginY">
+              <label for="marginy" class="control-label col-sm-3">marginy</label>
               <div class="col-sm-7">
-                <input id="margin-y" class="form-control" type="range" min="-5000" max="5000" v-model.number="Marginy">
+                <input id="marginy" class="form-control" type="range" min="-5000" max="5000" v-model.number="Marginy">
               </div>
               <div class="col-sm-2">
                 <p>{{Marginy}}px</p>
@@ -61,9 +76,9 @@
             </div>
 
              <div class="form-group">
-              <label for="margin-y" class="control-label col-sm-3">radius</label>
+              <label for="radius" class="control-label col-sm-3">radius</label>
               <div class="col-sm-7">
-                <input id="margin-y" class="form-control" type="range" min="1" max="10" v-model.number="radius">
+                <input id="radius" class="form-control" type="range" min="1" max="10" v-model.number="radius">
               </div>
               <div class="col-sm-2">
                 <p>{{radius}}px</p>
@@ -129,14 +144,15 @@
                  :node-text="nodeText"
                  :margin-x="Marginx"
                  :margin-y="Marginy"
-                 :autoMargin="true"
+                 :autoMarginY="autoMarginY"
+                 :autoMarginX="autoMarginX"
                  :radius="radius"
                  :type="type"
                  :layout-type="layoutType"
                  :duration="duration"
                  :grid="grid"
-                 :deep="deep"
-                 :isNotHideDefaultNode="true"
+                 :deep="deep || 2"
+                 :isNotHideDefaultNode="isNotHideDefaultNode"
                  :sections="['Проект', 'Сборки', 'Стадии', 'Разделы', 'Блоки', 'Задачи']"
                  class="viewport treeclass tree"
                  @clicked="onClick"
@@ -160,9 +176,12 @@ export default {
       duration: 500,
       Marginx: -100,
       Marginy: -100,
+      autoMarginX: true,
+      autoMarginY: true,
       radius: 10,
       nodeText: 'name',
       currentNode: null,
+      isNotHideDefaultNode: true,
       zoomable: true,
       isLoading: false,
       events: [],

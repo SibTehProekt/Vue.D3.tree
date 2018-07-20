@@ -12,9 +12,9 @@
 
         <!--<transition-group tag="g" name="list">-->
           <g v-for="(node, index) in nodes" :key="node.id" :opacity="node.style.opacity"
-             :transform="node.style.transform" :class="node.className">
+             :transform="node.style.transform" :class="node.className" @click="toggleNode(index, node)">
 
-            <circle :r="node.r" @click="toggleNode(index, node)"></circle>
+            <circle :r="node.r"></circle>
 
             <text :dx="node.textpos.x" :dy="node.textpos.y" :style="node.textStyle">{{ node.text }}</text>
 
@@ -29,8 +29,8 @@
 import euclidean from './euclidean-layout'
 import circular from './circular-layout'
 import {compareString, toPromise, translate} from './d3-utils'
-
 import * as d3 from 'd3'
+import {cloneDeep} from 'lodash'
 
 const layout = {
   euclidean,
@@ -77,7 +77,11 @@ const props = {
     type: Number,
     default: 20
   },
-  autoMargin: {
+  autoMarginX: {
+    type: Boolean,
+    default: false
+  },
+  autoMarginY: {
     type: Boolean,
     default: false
   },
@@ -103,7 +107,7 @@ const props = {
   },
   deep: {
     type: Number,
-    default: 3
+    default: 2
   },
   sections: {
     type: Array,
@@ -113,9 +117,21 @@ const props = {
     type: Boolean,
     default: false
   },
-  coefficient: {
+  coefficientX: {
     type: Number,
     default: 1
+  },
+  coefficientY: {
+    type: Number,
+    default: 1
+  },
+  zoomMax: {
+    type: Number,
+    default: 10
+  },
+  zoomMin: {
+    type: Number,
+    default: 0.1
   }
 }
 
@@ -124,24 +140,21 @@ export default {
   props,
   data () {
     return {
-      innerData: this.data,
+      innerData: cloneDeep(this.data),
       depth: 0,
       maxTextLenght: {
         first: 0,
         last: 0
       },
       render: false,
-      zoom: {
-        min: 0.1,
-        max: 10
-      },
       tree: null,
       tmp: {
         lines: [],
         automargin: {
           counter: []
         }
-      }
+      },
+      minMargin: 100
     }
   },
   beforeMount () {
@@ -153,13 +166,13 @@ export default {
     })
   },
   mounted () {
-    this.tree = this.initLayout()
+    this.update()
     this.$nextTick(() => {
       this.render = !this.render
       this.$nextTick(() => {
         if (this.zoomable) {
           const svg = d3.select(this.$refs.svgTree)
-          let zoom = d3.zoom().scaleExtent([this.zoom.min, this.zoom.max]).on('zoom', this.zoomed(svg.select('g')))
+          let zoom = d3.zoom().scaleExtent([this.zoomMin, this.zoomMax]).on('zoom', this.zoomed(svg.select('g')))
           svg.call(zoom).on('wheel', () => d3.event.preventDefault())
           svg.call(zoom.transform, d3.zoomIdentity)
         }
@@ -169,11 +182,13 @@ export default {
   },
 
   methods: {
+    update () {
+      this.tree = this.initLayout()
+    },
     initLayout () {
       const size = this.getSize()
-      const tree = d3.tree()
-      const margin = this.margin(this.autoMargin)
-      console.log(margin)
+      const tree = this.type === 'cluster' ? d3.cluster() : d3.tree()
+      const margin = this.margin(this.autoMarginY, this.autoMarginX)
       this.layout.size(tree, size, margin, this.maxTextLenght)
       return tree
     },
@@ -191,7 +206,7 @@ export default {
           this.addFields(child, deep)
         }
       }
-      if (this.deep < deep) {
+      if (this.isNotHideDefaultNode && this.deep < deep) {
         dataNode._children = dataNode.children
         dataNode.children = null
       }
@@ -203,7 +218,7 @@ export default {
     },
     updateTransform (g, size) {
       size = size || this.getSize()
-      const margin = this.margin(this.autoMargin)
+      const margin = this.margin(this.autoMarginY, this.autoMarginX)
       return this.layout.updateTransform(g, margin, size, this.maxTextLenght)
     },
     onNodeClick (d) {
@@ -235,7 +250,7 @@ export default {
       return transitionPromise.then(() => true)
     },
     toggleNode (index, node) {
-      if (node.deep >= this.deep) {
+      if (node.deep >= this.deep && node.childrenExist) {
         let dataNode = this.searchNode(this.innerData, node.id)
         if (dataNode.children !== null) {
           this.tmp.automargin.counter[dataNode.deep + 1] -= dataNode.children.length
@@ -246,7 +261,7 @@ export default {
           dataNode.children = dataNode._children
           dataNode._children = null
         }
-        this.tree = this.initLayout()
+        this.update()
       }
     },
     searchNode (dataNode, id) {
@@ -266,22 +281,39 @@ export default {
     select: (index, node) => {
       this.selected = index
     },
-    margin (autoMargin = false) {
-      if (autoMargin) {
-        console.log({x: this.marginX, y: this.autoMarginY()})
-        return {x: this.marginX, y: this.autoMarginY()}
-      } else {
-        return {x: this.marginX, y: this.marginY}
+    margin (autoMarginY = false, autoMarginX = false) {
+      return {
+        x: autoMarginX ? this.getAutoMarginX() : this.marginX,
+        y: autoMarginY ? this.getAutoMarginY() : this.marginY
       }
     },
-    autoMarginY () {
+    getAutoMarginY () {
       let max = 0
       for (let item in this.tmp.automargin.counter) {
         if (this.tmp.automargin.counter[item] > max) {
           max = this.tmp.automargin.counter[item]
         }
       }
-      return -(max * (this.radius * 2)) * this.coefficient
+      let marginY = max * (this.radius * 2) * this.coefficientY
+      return this.culcMargin(marginY)
+    },
+    getAutoMarginX () {
+      let max = 0
+      for (let item in this.tmp.automargin.counter) {
+        if (this.tmp.automargin.counter[item] > max) {
+          max = this.tmp.automargin.counter[item]
+        }
+      }
+      let marginX = max / 10 * this.radius * this.coefficientY
+      return this.culcMargin(marginX)
+    },
+    culcMargin (margin) {
+      return -(margin > this.minMargin ? margin : this.minMargin)
+    },
+    cleanTmpAutoMarginCounter () {
+      for (let i in this.tmp.automargin.counter) {
+        this.tmp.automargin.counter[i] = 0
+      }
     }
   },
 
@@ -311,6 +343,7 @@ export default {
             id: d.data.id,
             r: this.radius,
             className: className,
+            childrenExist: d.data.childrenExist,
             text: d.data.name,
             deep: d.data.deep,
             style: {
@@ -353,16 +386,16 @@ export default {
         let lines = []
         let w = mainEl.select('path').node().getBBox().width
         let x = w / 2
-        let y = mainEl.node().getBBox().height
+        let {y, height} = mainEl.node().getBBox()
         for (let i = 0; i <= this.depth; i++) {
           lines.push({
             tx: x - (w / 2),
             ty: -25,
             text: this.sections[i],
             x1: x,
-            y1: 0,
+            y1: y,
             x2: x,
-            y2: y,
+            y2: height,
             className: 'linktree'
           })
           x += w
@@ -382,33 +415,52 @@ export default {
     },
 
     type () {
-      if (!this.internaldata.tree) {
-        return
-      }
-      this.internaldata.tree = this.tree
-      this.redraw()
+      this.update()
     },
 
     grid () {
       this.tmp.lines = this.lines
     },
 
+    autoMarginX () {
+      this.update()
+    },
+
+    autoMarginY () {
+      this.update()
+    },
+
     marginX () {
       this.tmp.lines = this.lines
-      this.tree = this.initLayout()
+      this.update()
     },
 
     marginY () {
       this.tmp.lines = this.lines
-      this.tree = this.initLayout()
+      this.update()
     },
 
     layout (newLayout, oldLayout) {
-      this.completeRedraw({layout: oldLayout})
+      // this.completeRedraw({layout: oldLayout})
+      this.update()
     },
 
     radius () {
-      this.completeRedraw({layout: this.layout})
+      this.update()
+    },
+
+    deep () {
+      this.innerData = cloneDeep(this.data)
+      this.cleanTmpAutoMarginCounter()
+      this.addFields(this.innerData)
+      this.update()
+    },
+
+    isNotHideDefaultNode () {
+      this.innerData = cloneDeep(this.data)
+      this.cleanTmpAutoMarginCounter()
+      this.addFields(this.innerData)
+      this.update()
     }
   }
 }
