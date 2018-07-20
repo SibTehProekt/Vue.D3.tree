@@ -112,6 +112,10 @@ const props = {
   isNotHideDefaultNode: {
     type: Boolean,
     default: false
+  },
+  coefficient: {
+    type: Number,
+    default: 1
   }
 }
 
@@ -133,7 +137,10 @@ export default {
       },
       tree: null,
       tmp: {
-        lines: []
+        lines: [],
+        automargin: {
+          counter: []
+        }
       }
     }
   },
@@ -150,10 +157,12 @@ export default {
     this.$nextTick(() => {
       this.render = !this.render
       this.$nextTick(() => {
-        const svg = d3.select(this.$refs.svgTree)
-        let zoom = d3.zoom().scaleExtent([this.zoom.min, this.zoom.max]).on('zoom', this.zoomed(svg.select('g')))
-        svg.call(zoom).on('wheel', () => d3.event.preventDefault())
-        svg.call(zoom.transform, d3.zoomIdentity)
+        if (this.zoomable) {
+          const svg = d3.select(this.$refs.svgTree)
+          let zoom = d3.zoom().scaleExtent([this.zoom.min, this.zoom.max]).on('zoom', this.zoomed(svg.select('g')))
+          svg.call(zoom).on('wheel', () => d3.event.preventDefault())
+          svg.call(zoom.transform, d3.zoomIdentity)
+        }
         this.tmp.lines = this.lines
       })
     })
@@ -163,13 +172,19 @@ export default {
     initLayout () {
       const size = this.getSize()
       const tree = d3.tree()
-      this.layout.size(tree, size, this.margin, this.maxTextLenght)
+      const margin = this.margin(this.autoMargin)
+      console.log(margin)
+      this.layout.size(tree, size, margin, this.maxTextLenght)
       return tree
     },
     addFields (dataNode, deep = 0) {
+      if (typeof this.tmp.automargin.counter[deep] === 'undefined') {
+        this.tmp.automargin.counter[deep] = 0
+      }
       dataNode.childrenExist = (typeof dataNode.children !== 'undefined')
       dataNode.clicking = this.isNotHideDefaultNode && this.deep <= deep
       dataNode.deep = deep
+      if (this.deep >= deep) this.tmp.automargin.counter[deep]++
       if (typeof dataNode.children !== 'undefined' && Array.isArray(dataNode.children)) {
         deep++
         for (let child of dataNode.children) {
@@ -188,7 +203,8 @@ export default {
     },
     updateTransform (g, size) {
       size = size || this.getSize()
-      return this.layout.updateTransform(g, this.margin, size, this.maxTextLenght)
+      const margin = this.margin(this.autoMargin)
+      return this.layout.updateTransform(g, margin, size, this.maxTextLenght)
     },
     onNodeClick (d) {
       if (d.parent !== null) {
@@ -213,19 +229,24 @@ export default {
         return Promise.resolve(false)
       }
       const {svg, zoom} = this.internaldata
-      const transitionPromise = toPromise(svg.transition().duration(this.duration).call(zoom.transform, () => d3.zoomIdentity))
+      const transitionPromise = toPromise(
+        svg.transition().duration(this.duration).call(zoom.transform, () => d3.zoomIdentity)
+      )
       return transitionPromise.then(() => true)
     },
     toggleNode (index, node) {
       if (node.deep >= this.deep) {
         let dataNode = this.searchNode(this.innerData, node.id)
         if (dataNode.children !== null) {
+          this.tmp.automargin.counter[dataNode.deep + 1] -= dataNode.children.length
           dataNode._children = dataNode.children
           dataNode.children = null
         } else {
+          this.tmp.automargin.counter[dataNode.deep + 1] += dataNode._children.length
           dataNode.children = dataNode._children
           dataNode._children = null
         }
+        this.tree = this.initLayout()
       }
     },
     searchNode (dataNode, id) {
@@ -244,6 +265,23 @@ export default {
     },
     select: (index, node) => {
       this.selected = index
+    },
+    margin (autoMargin = false) {
+      if (autoMargin) {
+        console.log({x: this.marginX, y: this.autoMarginY()})
+        return {x: this.marginX, y: this.autoMarginY()}
+      } else {
+        return {x: this.marginX, y: this.marginY}
+      }
+    },
+    autoMarginY () {
+      let max = 0
+      for (let item in this.tmp.automargin.counter) {
+        if (this.tmp.automargin.counter[item] > max) {
+          max = this.tmp.automargin.counter[item]
+        }
+      }
+      return -(max * (this.radius * 2)) * this.coefficient
     }
   },
 
@@ -263,12 +301,16 @@ export default {
           if (this.depth < d.depth) {
             this.depth = d.depth
           }
+
+          let className = 'nodetree' +
+            (d.children && d.children !== null ? ' node--internal-opened' : ' node--internal-closed') +
+            (!d.data.childrenExist || d.parent === null || (this.isNotHideDefaultNode && !d.data.clicking)
+              ? ' node--notclick' : '')
+
           return {
             id: d.data.id,
             r: this.radius,
-            className: 'nodetree' +
-              (d.children && d.children !== null ? ' node--internal-opened' : ' node--internal-closed') +
-              (!d.data.childrenExist || d.parent === null || (this.isNotHideDefaultNode && !d.data.clicking) ? ' node--notclick' : ''),
+            className: className,
             text: d.data.name,
             deep: d.data.deep,
             style: {
@@ -306,19 +348,21 @@ export default {
       }
     },
     lines () {
-      if (this.nodes && this.$refs.main) {
+      if (this.$refs.main && this.grid) {
+        let mainEl = d3.select(this.$refs.main)
         let lines = []
-        let w = d3.select(this.$refs.main).select('path').node().getBBox().width
+        let w = mainEl.select('path').node().getBBox().width
         let x = w / 2
+        let y = mainEl.node().getBBox().height
         for (let i = 0; i <= this.depth; i++) {
           lines.push({
             tx: x - (w / 2),
             ty: -25,
             text: this.sections[i],
             x1: x,
-            y1: -30,
+            y1: 0,
             x2: x,
-            y2: this.$refs.main.getBBox().height + 30,
+            y2: y,
             className: 'linktree'
           })
           x += w
@@ -327,10 +371,6 @@ export default {
       }
       return []
     },
-    margin () {
-      return {x: this.marginX, y: this.marginY}
-    },
-
     layout () {
       return layout[this.layoutType]
     }
@@ -347,6 +387,10 @@ export default {
       }
       this.internaldata.tree = this.tree
       this.redraw()
+    },
+
+    grid () {
+      this.tmp.lines = this.lines
     },
 
     marginX () {
