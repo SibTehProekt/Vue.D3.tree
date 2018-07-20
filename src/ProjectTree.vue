@@ -1,7 +1,7 @@
 <template>
   <div>
     <svg :width="width" :height="height" v-if="render" ref="svgTree">
-      <g transform="translate(100,30) scale(1)" ref="main">
+      <g ref="main">
 
         <line :x1="ln.x1" :y1="ln.y1" :x2="ln.x2" :y2="ln.y2" v-for="ln in tmp.lines" :class="ln.className"></line>
         <text :x="ln.tx" :y="ln.ty" v-for="ln in tmp.lines" text-anchor="middle">{{ ln.text }}</text>
@@ -13,11 +13,8 @@
         <!--<transition-group tag="g" name="list">-->
           <g v-for="(node, index) in nodes" :key="node.id" :opacity="node.style.opacity"
              :transform="node.style.transform" :class="node.className" @click="toggleNode(index, node)">
-
             <circle :r="node.r"></circle>
-
             <text :dx="node.textpos.x" :dy="node.textpos.y" :style="node.textStyle">{{ node.text }}</text>
-
           </g>
         <!--</transition-group>-->
       </g>
@@ -113,7 +110,7 @@ const props = {
     type: Array,
     default: []
   },
-  isNotHideDefaultNode: {
+  hideDeepNodes: {
     type: Boolean,
     default: false
   },
@@ -127,7 +124,7 @@ const props = {
   },
   zoomMax: {
     type: Number,
-    default: 10
+    default: 1.5
   },
   zoomMin: {
     type: Number,
@@ -185,6 +182,12 @@ export default {
     update () {
       this.tree = this.initLayout()
     },
+    upgrade () {
+      this.innerData = cloneDeep(this.data)
+      this.cleanTmpAutoMarginCounter()
+      this.addFields(this.innerData)
+      this.update()
+    },
     initLayout () {
       const size = this.getSize()
       const tree = this.type === 'cluster' ? d3.cluster() : d3.tree()
@@ -197,16 +200,16 @@ export default {
         this.tmp.automargin.counter[deep] = 0
       }
       dataNode.childrenExist = (typeof dataNode.children !== 'undefined')
-      dataNode.clicking = this.isNotHideDefaultNode && this.deep <= deep
+      dataNode.clicking = this.hideDeepNodes && this.deep <= deep
       dataNode.deep = deep
-      if (this.deep >= deep) this.tmp.automargin.counter[deep]++
+      if (!this.hideDeepNodes || this.deep >= deep) this.tmp.automargin.counter[deep]++
       if (typeof dataNode.children !== 'undefined' && Array.isArray(dataNode.children)) {
         deep++
         for (let child of dataNode.children) {
           this.addFields(child, deep)
         }
       }
-      if (this.isNotHideDefaultNode && this.deep < deep) {
+      if (this.hideDeepNodes && this.deep < deep) {
         dataNode._children = dataNode.children
         dataNode.children = null
       }
@@ -312,7 +315,7 @@ export default {
     },
     cleanTmpAutoMarginCounter () {
       for (let i in this.tmp.automargin.counter) {
-        this.tmp.automargin.counter[i] = 0
+        this.tmp.automargin.counter[i] = undefined
       }
     }
   },
@@ -336,7 +339,7 @@ export default {
 
           let className = 'nodetree' +
             (d.children && d.children !== null ? ' node--internal-opened' : ' node--internal-closed') +
-            (!d.data.childrenExist || d.parent === null || (this.isNotHideDefaultNode && !d.data.clicking)
+            (!d.data.childrenExist || d.parent === null || (this.hideDeepNodes && !d.data.clicking)
               ? ' node--notclick' : '')
 
           return {
@@ -390,7 +393,7 @@ export default {
         for (let i = 0; i <= this.depth; i++) {
           lines.push({
             tx: x - (w / 2),
-            ty: -25,
+            ty: y,
             text: this.sections[i],
             x1: x,
             y1: y,
@@ -450,17 +453,11 @@ export default {
     },
 
     deep () {
-      this.innerData = cloneDeep(this.data)
-      this.cleanTmpAutoMarginCounter()
-      this.addFields(this.innerData)
-      this.update()
+      this.upgrade()
     },
 
-    isNotHideDefaultNode () {
-      this.innerData = cloneDeep(this.data)
-      this.cleanTmpAutoMarginCounter()
-      this.addFields(this.innerData)
-      this.update()
+    hideDeepNodes () {
+      this.upgrade()
     }
   }
 }

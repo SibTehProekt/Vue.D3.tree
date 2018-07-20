@@ -9,8 +9,8 @@
             <div class="form-horizontal">
 
             <div class="form-group">
-              <label for="isNotHideDefaultNode" class="control-label">Fix nodes by default</label>
-              <input type="checkbox" id="isNotHideDefaultNode" v-model="isNotHideDefaultNode"/>
+              <label for="hideDeepNodes" class="control-label">Hide deep nodes</label>
+              <input type="checkbox" id="hideDeepNodes" v-model="hideDeepNodes"/>
             </div>
 
             <div class="form-group">
@@ -41,7 +41,7 @@
             <div class="form-group">
               <label for="deep" class="control-label col-sm-3">Deep</label>
               <div class="col-sm-7">
-                <input id="deep" class="form-control" type="number" min="2" max="6" v-model.number="deep">
+                <input id="deep" class="form-control" type="number" min="2" max="5" v-model.number="deep">
               </div>
             </div>
 
@@ -151,8 +151,8 @@
                  :layout-type="layoutType"
                  :duration="duration"
                  :grid="grid"
-                 :deep="deep || 2"
-                 :isNotHideDefaultNode="isNotHideDefaultNode"
+                 :deep="(deep < 1 ? 1 : deep)"
+                 :hideDeepNodes="hideDeepNodes"
                  :sections="['Проект', 'Сборки', 'Стадии', 'Разделы', 'Блоки', 'Задачи']"
                  class="viewport treeclass tree"
                  @clicked="onClick"
@@ -181,7 +181,7 @@ export default {
       radius: 10,
       nodeText: 'name',
       currentNode: null,
-      isNotHideDefaultNode: true,
+      hideDeepNodes: true,
       zoomable: true,
       isLoading: false,
       events: [],
