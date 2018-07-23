@@ -1,6 +1,9 @@
 <template>
   <div>
-    <svg :width="width" :height="height" v-if="render" ref="svgTree">
+    <svg :width="width" :height="height" v-if="render" ref="svgTree"
+         @click="clickSpace"
+         @dblclick="onDblClickSpace"
+         @contextmenu="contextMenuSpace">
       <g ref="main">
 
         <line :x1="ln.x1" :y1="ln.y1" :x2="ln.x2" :y2="ln.y2" v-for="ln in tmp.lines" :class="ln.className"></line>
@@ -12,9 +15,14 @@
 
         <!--<transition-group tag="g" name="list">-->
           <g v-for="(node, index) in nodes" :key="node.id" :opacity="node.style.opacity"
-             :transform="node.style.transform" :class="node.className" @click="toggleNode(index, node)">
+             :transform="node.style.transform" :class="node.className"
+             @click="toggleNode($event, index, node)"
+             @dblclick="onDblClickNode($event, index, node)"
+             @contextmenu="contextMenuNode($event, index, node)">
+
             <circle :r="node.r"></circle>
             <text :dx="node.textpos.x" :dy="node.textpos.y" :style="node.textStyle">{{ node.text }}</text>
+
           </g>
         <!--</transition-group>-->
       </g>
@@ -239,15 +247,6 @@ export default {
       const margin = this.margin(this.autoMarginY, this.autoMarginX)
       return this.layout.updateTransform(g, margin, size, this.maxTextLenght)
     },
-    onNodeClick (d) {
-      if (d.parent !== null) {
-        if (d.children) {
-          this.collapse(d)
-        } else {
-          this.expand(d)
-        }
-      }
-    },
     zoomed (g) {
       return () => {
         const transform = d3.event.transform
@@ -267,21 +266,6 @@ export default {
         svg.transition().duration(this.duration).call(zoom.transform, () => d3.zoomIdentity)
       )
       return transitionPromise.then(() => true)
-    },
-    toggleNode (index, node) {
-      if ((this.clickableDefaultNodes || node.deep >= this.deep) && node.childrenExist && node.parentExist) {
-        let dataNode = this.searchNode(this.innerData, node.id)
-        if (dataNode.children !== null) {
-          this.tmp.automargin.counter[dataNode.deep + 1] -= dataNode.children.length
-          dataNode._children = dataNode.children
-          dataNode.children = null
-        } else {
-          this.tmp.automargin.counter[dataNode.deep + 1] += dataNode._children.length
-          dataNode.children = dataNode._children
-          dataNode._children = null
-        }
-        this.update()
-      }
     },
     searchNode (dataNode, id) {
       if (dataNode.id === id) {
@@ -333,6 +317,42 @@ export default {
       for (let i in this.tmp.automargin.counter) {
         this.tmp.automargin.counter[i] = undefined
       }
+    },
+
+    // методы - обработки событий
+    toggleNode (e, index, node) {
+      if ((this.clickableDefaultNodes || node.deep >= this.deep) && node.childrenExist && node.parentExist) {
+        let dataNode = this.searchNode(this.innerData, node.id)
+        if (dataNode.children !== null) {
+          this.tmp.automargin.counter[dataNode.deep + 1] -= dataNode.children.length
+          dataNode._children = dataNode.children
+          dataNode.children = null
+        } else {
+          this.tmp.automargin.counter[dataNode.deep + 1] += dataNode._children.length
+          dataNode.children = dataNode._children
+          dataNode._children = null
+        }
+        this.update()
+      }
+      e.stopPropagation()
+      this.$emit('onClickNode', e, index, node)
+    },
+    onDblClickNode (e, index, node) {
+      e.stopPropagation()
+      this.$emit('onDblClickNode', e, index, node)
+    },
+    contextMenuNode (e, index, node) {
+      e.stopPropagation()
+      this.$emit('contextMenuNode', e, index, node)
+    },
+    clickSpace (e) {
+      this.$emit('clickSpace', e)
+    },
+    onDblClickSpace (e) {
+      this.$emit('onDblClickSpace', e)
+    },
+    contextMenuSpace (e) {
+      this.$emit('contextMenuSpace', e)
     }
   },
 

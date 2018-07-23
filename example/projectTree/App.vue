@@ -164,6 +164,12 @@
                  class="viewport treeclass tree"
                  @clicked="onClick"
                  @expand="onExpand"
+                 @onClickNode="onClickNode"
+                 @onDblClickNode="onDblClickNode"
+                 @contextMenuNode="contextMenuNode"
+                 @clickSpace="clickSpace"
+                 @onDblClickSpace="onDblClickSpace"
+                 @contextMenuSpace="contextMenuSpace"
                  @retract="onRetract"/>
   </div>
 
@@ -241,6 +247,30 @@ export default {
     resetZoom () {
       this.isLoading = true
       this.$refs['tree'].resetZoom().then(() => { this.isLoading = false })
+    },
+    onClickNode (e, index, node) {
+      console.log(e)
+      console.log(index)
+      console.log(node)
+    },
+    onDblClickNode (e, index, node) {
+      console.log(e)
+      console.log(index)
+      console.log(node)
+    },
+    contextMenuNode (e, index, node) {
+      console.log(e)
+      console.log(index)
+      console.log(node)
+    },
+    clickSpace (e) {
+      console.log(e)
+    },
+    onDblClickSpace (e) {
+      console.log(e)
+    },
+    contextMenuSpace (e) {
+      console.log(e)
     }
   }
 }
