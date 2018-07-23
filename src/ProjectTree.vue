@@ -412,7 +412,7 @@ export default {
           let box = node.getBBox()
           if (y1 === null || y1 > box.y) y1 = box.y
           let y = box.y + box.height
-          if (y1 < y) y2 = y
+          if (y2 < y) y2 = y
         }
         for (let i = 0; i <= this.depth; i++) {
           lines.push({
