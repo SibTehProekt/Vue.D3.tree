@@ -170,6 +170,7 @@
                  @clickSpace="clickSpace"
                  @onDblClickSpace="onDblClickSpace"
                  @contextMenuSpace="contextMenuSpace"
+                 @moveSpace="moveSpace"
                  @retract="onRetract"/>
   </div>
 
@@ -270,6 +271,9 @@ export default {
     },
     contextMenuSpace (e) {
       console.log(e)
+    },
+    moveSpace (g) {
+      console.log(g)
     }
   }
 }
