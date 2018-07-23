@@ -434,30 +434,28 @@ export default {
         let mainEl = d3.select(this.$refs.main)
         let lines = []
         let path = mainEl.select('path')
-        if (Object.keys(path).length === 0) {
-          let w = path.node().getBBox().width
-          let x = w / 2
-          let y1 = null
-          let y2 = 0
-          for (let node of mainEl.selectAll('path').nodes()) {
-            let box = node.getBBox()
-            if (y1 === null || y1 > box.y) y1 = box.y
-            let y = box.y + box.height
-            if (y2 < y) y2 = y
-          }
-          for (let i = 0; i <= this.depth; i++) {
-            lines.push({
-              tx: x - (w / 2),
-              ty: y1 - this.gridMarginY,
-              text: this.sections[i],
-              x1: x,
-              y1: y1 - this.gridMarginY,
-              x2: x,
-              y2: y2 + this.gridMarginY,
-              className: 'linktree'
-            })
-            x += w
-          }
+        let w = path.node().getBBox().width
+        let x = w / 2
+        let y1 = null
+        let y2 = 0
+        for (let node of mainEl.selectAll('path').nodes()) {
+          let box = node.getBBox()
+          if (y1 === null || y1 > box.y) y1 = box.y
+          let y = box.y + box.height
+          if (y2 < y) y2 = y
+        }
+        for (let i = 0; i <= this.depth; i++) {
+          lines.push({
+            tx: x - (w / 2),
+            ty: y1 - this.gridMarginY,
+            text: this.sections[i],
+            x1: x,
+            y1: y1 - this.gridMarginY,
+            x2: x,
+            y2: y2 + this.gridMarginY,
+            className: 'linktree'
+          })
+          x += w
         }
         return lines
       }
