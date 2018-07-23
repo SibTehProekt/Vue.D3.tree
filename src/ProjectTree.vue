@@ -430,7 +430,7 @@ export default {
       }
     },
     lines () {
-      if (!this.dataIsEmpty && this.$refs.main && this.grid) {
+      if (!this.dataIsEmpty && typeof this.innerData.children !== 'undefined' && this.$refs.main && this.grid) {
         let mainEl = d3.select(this.$refs.main)
         let lines = []
         let path = mainEl.select('path')
