@@ -178,7 +178,8 @@ export default {
           y2: 100
         }
       },
-      minMargin: 100
+      minMargin: 100,
+      isMouseDown: false
     }
   },
   beforeMount () {
@@ -254,6 +255,7 @@ export default {
     updateTransform (g, size) {
       size = size || this.getSize()
       const margin = this.margin(this.autoMarginY, this.autoMarginX)
+      this.$emit('moveSpace', g, size)
       return this.layout.updateTransform(g, margin, size, this.maxTextLenght)
     },
     zoomed (g) {
