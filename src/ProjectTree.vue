@@ -1,6 +1,6 @@
 <template>
   <div>
-    <svg :width="width" :height="height" v-if="render" ref="svgTree"
+    <svg :width="width" :height="height" v-if="!dataIsEmpty && render" ref="svgTree"
          @click="clickSpace"
          @dblclick="onDblClickSpace"
          @contextmenu="contextMenuSpace">
@@ -27,6 +27,9 @@
         <!--</transition-group>-->
       </g>
     </svg>
+    <svg :width="width" :height="height" ref="dataisempty" v-else-if="render">
+      <text :x="$el.clientWidth / 2" :y="$el.clientHeight / 2" text-anchor="middle">{{ noDataText }}</text>
+    </svg>
   </div>
 </template>
 
@@ -35,7 +38,7 @@ import euclidean from './euclidean-layout'
 import circular from './circular-layout'
 import {compareString, toPromise, translate} from './d3-utils'
 import * as d3 from 'd3'
-import {cloneDeep} from 'lodash'
+import {isEmpty, cloneDeep} from 'lodash'
 
 const layout = {
   euclidean,
@@ -145,6 +148,10 @@ const props = {
   clickableDefaultNodes: {
     type: Boolean,
     default: true
+  },
+  noDataText: {
+    type: String,
+    default: 'Data not available'
   }
 }
 
@@ -175,7 +182,9 @@ export default {
     }
   },
   beforeMount () {
-    this.addFields(this.innerData)
+    if (!this.dataIsEmpty && typeof this.innerData.children !== 'undefined') {
+      this.addFields(this.innerData)
+    }
   },
   updated: function () {
     this.$nextTick(function () {
@@ -358,7 +367,7 @@ export default {
 
   computed: {
     root () {
-      if (this.innerData) {
+      if (!this.dataIsEmpty) {
         return this.tree(d3.hierarchy(this.innerData).sort((a, b) => {
           return compareString(a.data.text, b.data.text)
         }))
@@ -366,7 +375,7 @@ export default {
       return null
     },
     nodes () {
-      if (this.root) {
+      if (!this.dataIsEmpty && this.root) {
         this.depth = 0
         return this.root.descendants().map(d => {
           if (this.depth < d.depth) {
@@ -402,7 +411,7 @@ export default {
       }
     },
     links () {
-      if (this.root) {
+      if (!this.dataIsEmpty && this.root) {
         return this.root.descendants().slice(1).map((d) => {
           let y1 = d.y
           let x1 = d.x
@@ -421,31 +430,34 @@ export default {
       }
     },
     lines () {
-      if (this.$refs.main && this.grid) {
+      if (!this.dataIsEmpty && this.$refs.main && this.grid) {
         let mainEl = d3.select(this.$refs.main)
         let lines = []
-        let w = mainEl.select('path').node().getBBox().width
-        let x = w / 2
-        let y1 = null
-        let y2 = 0
-        for (let node of mainEl.selectAll('path').nodes()) {
-          let box = node.getBBox()
-          if (y1 === null || y1 > box.y) y1 = box.y
-          let y = box.y + box.height
-          if (y2 < y) y2 = y
-        }
-        for (let i = 0; i <= this.depth; i++) {
-          lines.push({
-            tx: x - (w / 2),
-            ty: y1 - this.gridMarginY,
-            text: this.sections[i],
-            x1: x,
-            y1: y1 - this.gridMarginY,
-            x2: x,
-            y2: y2 + this.gridMarginY,
-            className: 'linktree'
-          })
-          x += w
+        let path = mainEl.select('path')
+        if (Object.keys(path).length === 0) {
+          let w = path.node().getBBox().width
+          let x = w / 2
+          let y1 = null
+          let y2 = 0
+          for (let node of mainEl.selectAll('path').nodes()) {
+            let box = node.getBBox()
+            if (y1 === null || y1 > box.y) y1 = box.y
+            let y = box.y + box.height
+            if (y2 < y) y2 = y
+          }
+          for (let i = 0; i <= this.depth; i++) {
+            lines.push({
+              tx: x - (w / 2),
+              ty: y1 - this.gridMarginY,
+              text: this.sections[i],
+              x1: x,
+              y1: y1 - this.gridMarginY,
+              x2: x,
+              y2: y2 + this.gridMarginY,
+              className: 'linktree'
+            })
+            x += w
+          }
         }
         return lines
       }
@@ -453,6 +465,9 @@ export default {
     },
     layout () {
       return layout[this.layoutType]
+    },
+    dataIsEmpty () {
+      return isEmpty(this.innerData)
     }
   },
 

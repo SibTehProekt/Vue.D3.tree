@@ -178,7 +178,8 @@
 
 <script>
 import {projectTree} from '../../src/'
-import data from '../../data/data_project'
+// import data from '../../data/data_project'
+let data = null
 
 export default {
   name: 'app',
