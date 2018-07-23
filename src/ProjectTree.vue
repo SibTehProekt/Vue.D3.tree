@@ -393,6 +393,7 @@ export default {
             className: className,
             childrenExist: d.data.childrenExist,
             parentExist: d.parent !== null,
+            obj: d.data,
             text: d.data.name,
             deep: d.data.deep,
             style: {
