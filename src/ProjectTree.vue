@@ -522,7 +522,7 @@ export default {
 }
 </script>
 
-<style>
+<style scoped>
 svg {
   transform: translate3d(0, 0, 0);
   backface-visibility: hidden;
@@ -533,44 +533,44 @@ svg * {
   will-change: transform;
 }
 
-.treeclass .nodetree  circle {
+.nodetree  circle {
   fill: rgb(255, 255, 255);
   stroke: steelblue;
   stroke-width: 1.5px;
 }
 
-.treeclass .node--notclick circle {
+.node--notclick circle {
   cursor: default !important;
 }
 
-.treeclass .node--internal-opened  circle {
+.node--internal-opened  circle {
   fill: rgb(255, 255, 255);
   cursor: pointer;
 }
 
-.treeclass .node--internal-closed circle {
+.node--internal-closed circle {
   fill:  rgb(176, 196, 222);
   cursor: pointer;
 }
 
-.treeclass .nodetree {
+.nodetree {
   /*transition: all 1s;*/
 }
 
-.treeclass .nodetree text {
+.nodetree text {
   font: 10px sans-serif;
   cursor: pointer;
 }
 
-.treeclass .nodetree.selected text {
+.nodetree.selected text {
   font-weight: bold;
 }
 
-.treeclass .node--internal text {
+.node--internal text {
   text-shadow: 0 1px 0 #fff, 0 -1px 0 #fff, 1px 0 0 #fff, -1px 0 0 #fff;
 }
 
-.treeclass .linktree {
+.linktree {
   fill: none;
   stroke: #555;
   stroke-opacity: 0.4;
