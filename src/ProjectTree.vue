@@ -392,6 +392,7 @@ export default {
 
           let className = 'nodetree' +
             (d.children && d.children !== null ? ' node--internal-opened' : ' node--internal-closed') +
+            (!d.data.childrenExist ? ' node--not-children' : '') +
             (!d.data.childrenExist || d.parent === null || (this.hideDeepNodes && !d.data.clicking)
               ? ' node--notclick' : '')
 
@@ -558,6 +559,10 @@ svg * {
 
 .node--notclick circle {
   cursor: default !important;
+}
+
+.node--not-children circle {
+  fill: rgb(255, 255, 255) !important;
 }
 
 .node--internal-opened  circle {
