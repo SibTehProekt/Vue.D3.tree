@@ -21,6 +21,9 @@
              @contextmenu="contextMenuNode($event, index, node)">
 
             <circle :r="node.r"></circle>
+            <text dx="0" :dy="radius <= 8 ? -10 : 3" text-anchor="middle" v-if="node.childrenExist">
+              {{ node.obj.children ? node.obj.children.length : node.obj._children.length }}
+            </text>
             <text :dx="node.textpos.x" :dy="node.textpos.y" :style="node.textStyle">{{ node.text }}</text>
 
           </g>
@@ -152,6 +155,10 @@ const props = {
   noDataText: {
     type: String,
     default: 'Data not available'
+  },
+  counter: {
+    type: Boolean,
+    default: false
   }
 }
 

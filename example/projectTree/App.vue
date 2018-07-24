@@ -9,6 +9,11 @@
             <div class="form-horizontal">
 
             <div class="form-group">
+              <label for="counter" class="control-label">Counter</label>
+              <input type="checkbox" id="counter" v-model="counter"/>
+            </div>
+
+            <div class="form-group">
               <label for="clickable" class="control-label">Clickable deep nodes</label>
               <input type="checkbox" id="clickable" v-model="clickableDefaultNodes"/>
             </div>
@@ -144,6 +149,7 @@
   <div class="col-md-9 panel panel-default">
     <projectTree ref="tree"
                  :identifier="getId"
+                 :counter="counter"
                  :zoomable="zoomable"
                  :data="data"
                  :node-text="nodeText"
@@ -202,6 +208,7 @@ export default {
       deep: 2,
       gridMarginY: 50,
       clickableDefaultNodes: false,
+      counter: false,
       data
     }
   },
@@ -273,7 +280,7 @@ export default {
       console.log(e)
     },
     moveSpace (g) {
-      console.log(g)
+      // console.log(g)
     }
   }
 }
