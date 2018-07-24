@@ -178,8 +178,7 @@ export default {
           y2: 100
         }
       },
-      minMargin: 100,
-      isMouseDown: false
+      minMargin: 100
     }
   },
   beforeMount () {
@@ -332,7 +331,7 @@ export default {
 
     // методы - обработки событий
     toggleNode (e, index, node) {
-      if ((this.clickableDefaultNodes || node.deep >= this.deep) && node.childrenExist && node.parentExist) {
+      if ((this.clickableDefaultNodes || node.deep >= this.deep) && node.childrenExist && node.parent !== null) {
         let dataNode = this.searchNode(this.innerData, node.id)
         if (dataNode.children !== null) {
           this.tmp.automargin.counter[dataNode.deep + 1] -= dataNode.children.length
@@ -394,7 +393,7 @@ export default {
             r: this.radius,
             className: className,
             childrenExist: d.data.childrenExist,
-            parentExist: d.parent !== null,
+            parent: d.parent !== null ? d.parent.data.id : null,
             obj: d.data,
             text: d.data.name,
             deep: d.data.deep,
