@@ -331,7 +331,7 @@ export default {
 
     // методы - обработки событий
     toggleNode (e, index, node) {
-      if ((this.clickableDefaultNodes || node.deep >= this.deep) && node.childrenExist && node.parent !== null) {
+      if ((this.clickableDefaultNodes || node.deep >= this.deep) && node.childrenExist && !isEmpty(node.parent)) {
         let dataNode = this.searchNode(this.innerData, node.id)
         if (dataNode.children !== null) {
           this.tmp.automargin.counter[dataNode.deep + 1] -= dataNode.children.length
@@ -388,12 +388,22 @@ export default {
             (!d.data.childrenExist || d.parent === null || (this.hideDeepNodes && !d.data.clicking)
               ? ' node--notclick' : '')
 
+          let parent = Object.assign({}, d.parent)
+
+          if (typeof parent.children !== 'undefined') {
+            delete parent.children
+          }
+
+          if (typeof parent._children !== 'undefined') {
+            delete parent._children
+          }
+
           return {
             id: d.data.id,
             r: this.radius,
             className: className,
             childrenExist: d.data.childrenExist,
-            parent: d.parent !== null ? d.parent.data.id : null,
+            parent: parent,
             obj: d.data,
             text: d.data.name,
             deep: d.data.deep,
