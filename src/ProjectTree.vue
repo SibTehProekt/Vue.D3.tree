@@ -41,7 +41,7 @@ import euclidean from './euclidean-layout'
 import circular from './circular-layout'
 import {compareString, toPromise, translate} from './d3-utils'
 import * as d3 from 'd3'
-import {isEmpty, cloneDeep, floor} from 'lodash'
+import {isEmpty, cloneDeep} from 'lodash'
 
 const layout = {
   euclidean,
@@ -186,7 +186,7 @@ export default {
         }
       },
       minMargin: 0,
-      zoom: {x: 0, y: 0, scale: 1, scaleDouble: 1}
+      zoom: {x: 0, y: 0, scale: 1}
     }
   },
   beforeMount () {
@@ -227,8 +227,10 @@ export default {
       let rootPointY = d3.select('g').select('g').node().getBoundingClientRect().top
       let textHeight = d3.select('text').node().getBBox().height
 
-      let scaleDouble = (tree.clientWidth * tree.clientHeight) / (main.getBBox().width * main.getBBox().height)
-      let scale = floor(scaleDouble, 4)
+      let scaleByWidth = tree.clientWidth / main.getBBox().width
+      let scaleByHeight = tree.clientHeight / main.getBBox().height
+      let scale = scaleByWidth > scaleByHeight ? scaleByWidth : scaleByHeight
+      // let scale = (tree.clientWidth * tree.clientHeight) / (main.getBBox().width * main.getBBox().height)
       scale = scale < this.zoomMin ? this.zoomMin : (scale > this.zoomMax ? this.zoomMax : scale)
 
       let x = tree.clientWidth / 2
@@ -239,7 +241,6 @@ export default {
       y -= rootPointY * scale  // вычитаем позицию главной точки
       y += ((this.getMaxDepth() * this.radius * 2 * this.coefficientY) + textHeight) * scale // убираем сякие маргины
 
-      this.zoom.scaleDouble = scaleDouble
       this.zoom.scale = scale
       this.zoom.x = x
       this.zoom.y = y

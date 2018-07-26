@@ -287,7 +287,7 @@ export default {
 }
 
 .tree {
-  height: 900px;
+  height: 600px;
   width: 100%;
 }
 
