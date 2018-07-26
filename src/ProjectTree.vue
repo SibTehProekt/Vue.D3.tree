@@ -215,7 +215,7 @@ export default {
       if (this.zoomable) {
         this.computeZoom()
         svg.call(zoom).on('wheel', () => d3.event.preventDefault())
-        svg.call(zoom.transform, this.getDefaultZoom())
+        svg.call(zoom.transform, !this.dataIsEmpty ? this.getDefaultZoom() : d3.zoomIdentity)
       }
     })
   },
