@@ -238,10 +238,9 @@ export default {
       x += (pw / 2 + this.getMaxDepth()) * scale // встаем в начало сетки
       x -= pw * (this.depth + 1) * scale / 2 // отнимаем половину растояния сетки, чтобы встать в центр сетки
 
-      console.log(main.getBBox().height / 2 * scale)
-      console.log(tree.clientHeight / 2)
-
-      let y = this.getMaxDepth() * this.diameter * scale + this.gridMarginY * scale + tree.clientHeight / 2 - main.getBBox().height / 2 * scale
+      let y = this.getMaxDepth() * this.diameter * scale
+      y += (tree.clientHeight / 2 - main.getBBox().height / 2 * scale)
+      y -= this.gridMarginY / 2 * scale
 
       this.zoom.scale = scale
       this.zoom.x = x
