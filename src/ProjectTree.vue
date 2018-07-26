@@ -213,9 +213,11 @@ export default {
       }
     }).then(() => {
       if (this.zoomable) {
-        this.computeZoom()
+        if (!this.dataIsEmpty && !this.dataNotChildren) {
+          this.computeZoom()
+        }
         svg.call(zoom).on('wheel', () => d3.event.preventDefault())
-        svg.call(zoom.transform, !this.dataIsEmpty ? this.getDefaultZoom() : d3.zoomIdentity)
+        svg.call(zoom.transform, !this.dataIsEmpty && !this.dataNotChildren ? this.getDefaultZoom() : d3.zoomIdentity)
       }
     })
   },
@@ -260,7 +262,9 @@ export default {
 
       this.$nextTick().then(() => {
         this.$nextTick(() => {
-          this.computeZoom()
+          if (!this.dataIsEmpty && !this.dataNotChildren) {
+            this.computeZoom()
+          }
           this.resetZoom()
         })
       })
@@ -318,7 +322,9 @@ export default {
       const svg = d3.select(this.$refs.svgTree)
       let zoom = d3.zoom().scaleExtent([this.zoomMin, this.zoomMax]).on('zoom', this.zoomed(svg.select('g')))
       const transitionPromise = toPromise(
-        svg.transition().duration(this.duration).call(zoom.transform, () => this.getDefaultZoom())
+        svg.transition().duration(this.duration).call(zoom.transform, () => {
+          return !this.dataIsEmpty && !this.dataNotChildren ? this.getDefaultZoom() : d3.zoomIdentity
+        })
       )
       return transitionPromise.then(() => true)
     },
@@ -386,7 +392,9 @@ export default {
         }
         this.update()
         this.$nextTick(() => {
-          this.computeZoom()
+          if (!this.dataIsEmpty && !this.dataNotChildren) {
+            this.computeZoom()
+          }
         })
       }
       e.stopPropagation()
@@ -535,6 +543,9 @@ export default {
     },
     dataIsEmpty () {
       return isEmpty(this.innerData)
+    },
+    dataNotChildren () {
+      return typeof this.innerData.children === 'undefined'
     },
     diameter () {
       return this.radius * 2

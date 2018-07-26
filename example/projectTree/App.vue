@@ -36,6 +36,7 @@
                   <option value="1">data 1</option>
                   <option value="2">data 2</option>
                   <option value="3">data 3</option>
+                  <option value="4">data 4</option>
                 </select>
               </div>
             </div>
@@ -173,6 +174,7 @@ import data0 from '../../data/data_project_small'
 import data1 from '../../data/data_project'
 import data2 from '../../data/data_project_1'
 import data3 from '../../data/data_project_2'
+import data4 from '../../data/data_project_3'
 
 export default {
   name: 'app',
@@ -211,6 +213,8 @@ export default {
       this.data = data2
     } else if (this.dataCheck === '3') {
       this.data = data3
+    } else if (this.dataCheck === '4') {
+      this.data = data4
     }
   },
   components: {
@@ -226,6 +230,8 @@ export default {
         this.data = data2
       } else if (value === '3') {
         this.data = data3
+      } else if (value === '4') {
+        this.data = data4
       }
     }
   },
