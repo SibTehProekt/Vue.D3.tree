@@ -1,6 +1,6 @@
 <template>
   <div id="app" class="container-fluid">
-    <div class="col-md-3">
+    <div class="col-md-3" v-if="showToolbar">
 
       <div class="panel panel-default">
         <div class="panel-heading">Props</div>
@@ -117,38 +117,20 @@
               </div>
             </div>
 
-            <div class="form-group">
-              <span v-if="currentNode">Current Node: {{currentNode.data.text}}</span>
-              <span v-else>No Node selected.</span>
-               <i v-if="isLoading" class="fa fa-spinner fa-spin fa-2x fa-fw"></i>
-            </div>
-
-            <button type="button" :disabled="!currentNode" class="btn btn-primary" @click="expandAll" data-toggle="tooltip" data-placement="top" title="Expand All from current">
-            <i class="fa fa-expand" aria-hidden="true"></i>
-            </button>
-
-            <button type="button" :disabled="!currentNode" class="btn btn-secondary" @click="collapseAll" data-toggle="tooltip" data-placement="top" title="Collapse All from current">
-            <i class="fa fa-compress" aria-hidden="true"></i>
-            </button>
-
-            <button type="button" :disabled="!currentNode" class="btn btn-success" @click="showOnly" data-toggle="tooltip" data-placement="top" title="Show Only from current">
-            <i class="fa fa-search-plus" aria-hidden="true"></i>
-            </button>
-
-            <button type="button" :disabled="!currentNode" class="btn btn-warning" @click="show" data-toggle="tooltip" data-placement="top" title="Show current">
-            <i class="fa fa-binoculars" aria-hidden="true"></i>
-            </button>
-
-            <button v-if="zoomable" type="button" class="btn btn-warning" @click="resetZoom" data-toggle="tooltip" data-placement="top" title="Reset Zoom">
-            <i class="fa fa-arrows-alt" aria-hidden="true"></i>
-            </button>
-
         </div>
       </div>
     </div>
   </div>
 
-    <div class="col-md-9 panel panel-default">
+    <div class="panel panel-default" :class="showToolbar ? 'col-md-9' : ''">
+      <div class="toolbar">
+        <button class="btn btn-primary" @click="toggleToollbar"><i class="fa fa-wrench" aria-hidden="true"></i></button>
+        <button class="btn btn-warning" @click="update">upload</button>
+        <button class="btn btn-warning" @click="reboot">reload</button>
+        <button v-if="zoomable" type="button" class="btn btn-warning" @click="resetZoom" data-toggle="tooltip" data-placement="top" title="Reset Zoom">
+          <i class="fa fa-arrows-alt" aria-hidden="true"></i>
+        </button>
+      </div>
       <projectTree ref="tree"
                    :identifier="getId"
                    :counter="counter"
@@ -216,7 +198,8 @@ export default {
       clickableDefaultNodes: false,
       counter: false,
       data: null,
-      dataCheck: '2'
+      dataCheck: '1',
+      showToolbar: true
     }
   },
   beforeMount () {
@@ -308,6 +291,15 @@ export default {
     },
     moveSpace (g) {
       // console.log(g)
+    },
+    toggleToollbar () {
+      this.showToolbar = !this.showToolbar
+    },
+    update () {
+      this.$refs.tree.update()
+    },
+    reboot () {
+      this.$refs.tree.upgrade()
     }
   }
 }
@@ -323,8 +315,19 @@ export default {
   margin-top: 20px;
 }
 
+.panel-default {
+  position: relative;
+}
+
+.toolbar {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 99999999;
+}
+
 .tree {
-  height: 500px;
+  height: 600px;
   width: 100%;
 }
 

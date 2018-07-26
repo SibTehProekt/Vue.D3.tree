@@ -200,19 +200,23 @@ export default {
     })
   },
   mounted () {
-    this.update()
-    this.$nextTick(() => {
+    let svg = null
+    let zoom = null
+    this.$nextTick().then(() => {
+      this.update()
       this.render = !this.render
-      this.$nextTick(() => {
-        if (this.zoomable) {
-          const svg = d3.select(this.$refs.svgTree)
-          let zoom = d3.zoom().scaleExtent([this.zoomMin, this.zoomMax]).on('zoom', this.zoomed(svg.select('g')))
-          this.computeZoom()
-          svg.call(zoom).on('wheel', () => d3.event.preventDefault())
-          svg.call(zoom.transform, this.getDefaultZoom())
-        }
-        this.updateLines()
-      })
+    }).then(() => {
+      this.updateLines()
+      if (this.zoomable) {
+        svg = d3.select(this.$refs.svgTree)
+        zoom = d3.zoom().scaleExtent([this.zoomMin, this.zoomMax]).on('zoom', this.zoomed(svg.select('g')))
+      }
+    }).then(() => {
+      if (this.zoomable) {
+        this.computeZoom()
+        svg.call(zoom).on('wheel', () => d3.event.preventDefault())
+        svg.call(zoom.transform, this.getDefaultZoom())
+      }
     })
   },
 
@@ -224,22 +228,20 @@ export default {
       let tree = this.$refs.svgTree
       let main = this.$refs.main
       let pw = d3.select('path').node().getBBox().width
-      let rootPointY = d3.select('g').select('g').node().getBoundingClientRect().top
-      let textHeight = d3.select('text').node().getBBox().height
 
-      let scaleByWidth = tree.clientWidth / (main.getBBox().width + pw * this.zoom.scale)
-      let scaleByHeight = tree.clientHeight / main.getBBox().height
+      let scaleByWidth = tree.clientWidth / ((main.getBBox().width + pw / 2))
+      let scaleByHeight = tree.clientHeight / (main.getBBox().height + this.gridMarginY * 2)
       let scale = scaleByWidth > scaleByHeight ? scaleByHeight : scaleByWidth
-      // let scale = (tree.clientWidth * tree.clientHeight) / (main.getBBox().width * main.getBBox().height)
       scale = scale < this.zoomMin ? this.zoomMin : (scale > this.zoomMax ? this.zoomMax : scale)
 
       let x = tree.clientWidth / 2
       x += (pw / 2 + this.getMaxDepth()) * scale // встаем в начало сетки
       x -= pw * (this.depth + 1) * scale / 2 // отнимаем половину растояния сетки, чтобы встать в центр сетки
 
-      let y = tree.clientHeight / 2
-      y -= rootPointY * scale  // вычитаем позицию главной точки
-      y += ((this.getMaxDepth() * this.radius * 2 * this.coefficientY) + textHeight) * scale // убираем сякие маргины
+      console.log(main.getBBox().height / 2 * scale)
+      console.log(tree.clientHeight / 2)
+
+      let y = this.getMaxDepth() * this.diameter * scale + this.gridMarginY * scale + tree.clientHeight / 2 - main.getBBox().height / 2 * scale
 
       this.zoom.scale = scale
       this.zoom.x = x
@@ -256,6 +258,13 @@ export default {
       this.cleanTmpAutoMarginCounter()
       this.addFields(this.innerData)
       this.update()
+
+      this.$nextTick().then(() => {
+        this.$nextTick(() => {
+          this.computeZoom()
+          this.resetZoom()
+        })
+      })
     },
     initLayout () {
       const size = this.getSize()
@@ -347,7 +356,7 @@ export default {
       return max
     },
     getAutoMarginY () {
-      let marginY = this.getMaxDepth() * (this.radius * 2) * this.coefficientY
+      let marginY = this.getMaxDepth() * this.diameter * this.coefficientY
       return this.culcMargin(marginY)
     },
     getAutoMarginX () {
@@ -527,6 +536,9 @@ export default {
     },
     dataIsEmpty () {
       return isEmpty(this.innerData)
+    },
+    diameter () {
+      return this.radius * 2
     }
   },
 
