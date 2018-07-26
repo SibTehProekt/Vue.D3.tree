@@ -132,53 +132,43 @@
             </button>
 
         </div>
-
-        <div class="panel panel-default">
-          <div class="panel-heading">Events</div>
-
-          <div class="panel-body log">
-            <div v-for="(event,index) in events" :key="index">
-              <p><b>Name:</b> {{event.eventName}} <b>Data:</b>{{event.data.text}}</p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   </div>
 
-  <div class="col-md-9 panel panel-default">
-    <projectTree ref="tree"
-                 :identifier="getId"
-                 :counter="counter"
-                 :zoomable="zoomable"
-                 :data="data"
-                 :node-text="nodeText"
-                 :margin-x="Marginx"
-                 :margin-y="Marginy"
-                 :autoMarginY="autoMarginY"
-                 :autoMarginX="autoMarginX"
-                 :radius="radius"
-                 :type="type"
-                 :layout-type="layoutType"
-                 :duration="duration"
-                 :grid="grid"
-                 :deep="(deep < 1 ? 1 : deep)"
-                 :hideDeepNodes="hideDeepNodes"
-                 :gridMarginY="gridMarginY"
-                 :clickableDefaultNodes="clickableDefaultNodes"
-                 :sections="['Проект', 'Сборки', 'Стадии', 'Разделы', 'Блоки', 'Задачи']"
-                 class="viewport treeclass tree"
-                 @clicked="onClick"
-                 @expand="onExpand"
-                 @onClickNode="onClickNode"
-                 @onDblClickNode="onDblClickNode"
-                 @contextMenuNode="contextMenuNode"
-                 @clickSpace="clickSpace"
-                 @onDblClickSpace="onDblClickSpace"
-                 @contextMenuSpace="contextMenuSpace"
-                 @moveSpace="moveSpace"
-                 @retract="onRetract"/>
-  </div>
+    <div class="col-md-9 panel panel-default">
+      <projectTree ref="tree"
+                   :identifier="getId"
+                   :counter="counter"
+                   :zoomable="zoomable"
+                   :data="data"
+                   :node-text="nodeText"
+                   :margin-x="Marginx"
+                   :margin-y="Marginy"
+                   :autoMarginY="autoMarginY"
+                   :autoMarginX="autoMarginX"
+                   :radius="radius"
+                   :type="type"
+                   :layout-type="layoutType"
+                   :duration="duration"
+                   :grid="grid"
+                   :deep="(deep < 1 ? 1 : deep)"
+                   :hideDeepNodes="hideDeepNodes"
+                   :gridMarginY="gridMarginY"
+                   :clickableDefaultNodes="clickableDefaultNodes"
+                   :sections="['Проект', 'Сборки', 'Стадии', 'Разделы', 'Блоки', 'Задачи']"
+                   class="viewport treeclass tree"
+                   @clicked="onClick"
+                   @expand="onExpand"
+                   @onClickNode="onClickNode"
+                   @onDblClickNode="onDblClickNode"
+                   @contextMenuNode="contextMenuNode"
+                   @clickSpace="clickSpace"
+                   @onDblClickSpace="onDblClickSpace"
+                   @contextMenuSpace="contextMenuSpace"
+                   @moveSpace="moveSpace"
+                   @retract="onRetract"/>
+    </div>
 
   </div>
 </template>

@@ -41,7 +41,7 @@ import euclidean from './euclidean-layout'
 import circular from './circular-layout'
 import {compareString, toPromise, translate} from './d3-utils'
 import * as d3 from 'd3'
-import {isEmpty, cloneDeep} from 'lodash'
+import {isEmpty, cloneDeep, floor} from 'lodash'
 
 const layout = {
   euclidean,
@@ -185,7 +185,8 @@ export default {
           y2: 100
         }
       },
-      minMargin: 100
+      minMargin: 0,
+      zoom: {x: 0, y: 0, scale: 1, scaleDouble: 1}
     }
   },
   beforeMount () {
@@ -206,8 +207,9 @@ export default {
         if (this.zoomable) {
           const svg = d3.select(this.$refs.svgTree)
           let zoom = d3.zoom().scaleExtent([this.zoomMin, this.zoomMax]).on('zoom', this.zoomed(svg.select('g')))
+          this.computeZoom()
           svg.call(zoom).on('wheel', () => d3.event.preventDefault())
-          svg.call(zoom.transform, d3.zoomIdentity)
+          svg.call(zoom.transform, this.getDefaultZoom())
         }
         this.updateLines()
       })
@@ -215,6 +217,33 @@ export default {
   },
 
   methods: {
+    getDefaultZoom () {
+      return d3.zoomIdentity.translate(this.zoom.x, this.zoom.y).scale(this.zoom.scale)
+    },
+    computeZoom () {
+      let tree = this.$refs.svgTree
+      let main = this.$refs.main
+      let pw = d3.select('path').node().getBBox().width
+      let rootPointY = d3.select('g').select('g').node().getBoundingClientRect().top
+      let textHeight = d3.select('text').node().getBBox().height
+
+      let scaleDouble = (tree.clientWidth * tree.clientHeight) / (main.getBBox().width * main.getBBox().height)
+      let scale = floor(scaleDouble, 4)
+      scale = scale < this.zoomMin ? this.zoomMin : (scale > this.zoomMax ? this.zoomMax : scale)
+
+      let x = tree.clientWidth / 2
+      x += (pw / 2 + this.getMaxDepth()) * scale // встаем в начало сетки
+      x -= pw * (this.depth + 1) * scale / 2 // отнимаем половину растояния сетки, чтобы встать в центр сетки
+
+      let y = tree.clientHeight / 2
+      y -= rootPointY * scale  // вычитаем позицию главной точки
+      y += ((this.getMaxDepth() * this.radius * 2 * this.coefficientY) + textHeight) * scale // убираем сякие маргины
+
+      this.zoom.scaleDouble = scaleDouble
+      this.zoom.scale = scale
+      this.zoom.x = x
+      this.zoom.y = y
+    },
     update () {
       this.tree = this.initLayout()
     },
@@ -280,7 +309,7 @@ export default {
       const svg = d3.select(this.$refs.svgTree)
       let zoom = d3.zoom().scaleExtent([this.zoomMin, this.zoomMax]).on('zoom', this.zoomed(svg.select('g')))
       const transitionPromise = toPromise(
-        svg.transition().duration(this.duration).call(zoom.transform, () => d3.zoomIdentity)
+        svg.transition().duration(this.duration).call(zoom.transform, () => this.getDefaultZoom())
       )
       return transitionPromise.then(() => true)
     },
@@ -307,24 +336,21 @@ export default {
         y: autoMarginY ? this.getAutoMarginY() : this.marginY
       }
     },
-    getAutoMarginY () {
+    getMaxDepth () {
       let max = 0
       for (let item in this.tmp.automargin.counter) {
         if (this.tmp.automargin.counter[item] > max) {
           max = this.tmp.automargin.counter[item]
         }
       }
-      let marginY = max * (this.radius * 2) * this.coefficientY
+      return max
+    },
+    getAutoMarginY () {
+      let marginY = this.getMaxDepth() * (this.radius * 2) * this.coefficientY
       return this.culcMargin(marginY)
     },
     getAutoMarginX () {
-      let max = 0
-      for (let item in this.tmp.automargin.counter) {
-        if (this.tmp.automargin.counter[item] > max) {
-          max = this.tmp.automargin.counter[item]
-        }
-      }
-      let marginX = max / 10 * this.radius * this.coefficientY
+      let marginX = this.getMaxDepth() / 10 * this.radius * this.coefficientY
       return this.culcMargin(marginX)
     },
     culcMargin (margin) {
@@ -350,6 +376,9 @@ export default {
           dataNode._children = null
         }
         this.update()
+        this.$nextTick(() => {
+          this.computeZoom()
+        })
       }
       e.stopPropagation()
       this.$emit('onClickNode', e, index, node)
@@ -455,7 +484,8 @@ export default {
         let lines = []
         let path = mainEl.select('path')
         let w = path.node().getBBox().width
-        let x = w / 2
+        let hfW = w / 2
+        let x = hfW
         let y1 = null
         let y2 = 0
         for (let node of mainEl.selectAll('path').nodes()) {
@@ -464,9 +494,19 @@ export default {
           let y = box.y + box.height
           if (y2 < y) y2 = y
         }
+        lines.push({
+          tx: 0,
+          ty: 0,
+          text: '',
+          x1: -hfW,
+          y1: y1 - this.gridMarginY,
+          x2: -hfW,
+          y2: y2 + this.gridMarginY,
+          className: 'linktree'
+        })
         for (let i = 0; i <= this.depth; i++) {
           lines.push({
-            tx: x - (w / 2),
+            tx: x - hfW,
             ty: y1 - this.gridMarginY,
             text: this.sections[i],
             x1: x,
