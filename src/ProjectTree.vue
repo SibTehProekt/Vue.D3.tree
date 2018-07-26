@@ -227,9 +227,9 @@ export default {
       let rootPointY = d3.select('g').select('g').node().getBoundingClientRect().top
       let textHeight = d3.select('text').node().getBBox().height
 
-      let scaleByWidth = tree.clientWidth / main.getBBox().width
+      let scaleByWidth = tree.clientWidth / (main.getBBox().width + pw * this.zoom.scale)
       let scaleByHeight = tree.clientHeight / main.getBBox().height
-      let scale = scaleByWidth > scaleByHeight ? scaleByWidth : scaleByHeight
+      let scale = scaleByWidth > scaleByHeight ? scaleByHeight : scaleByWidth
       // let scale = (tree.clientWidth * tree.clientHeight) / (main.getBBox().width * main.getBBox().height)
       scale = scale < this.zoomMin ? this.zoomMin : (scale > this.zoomMax ? this.zoomMax : scale)
 
@@ -532,7 +532,8 @@ export default {
 
   watch: {
     data (current, old) {
-      this.onData(current)
+      this.upgrade()
+      // this.onData(current)
     },
 
     type () {

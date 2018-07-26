@@ -29,6 +29,18 @@
             </div>
 
             <div class="form-group">
+              <label for="dataCheck" class="control-label col-sm-3">Data</label>
+              <div  class="col-sm-9">
+                <select id="dataCheck" class="form-control" v-model="dataCheck">
+                  <option value="0">data 1 small</option>
+                  <option value="1">data 1</option>
+                  <option value="2">data 2</option>
+                  <option value="3">data 3</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
               <label for="type" class="control-label col-sm-3">type</label>
               <div  class="col-sm-9">
                 <select id="type" class="form-control" v-model="type">
@@ -175,7 +187,11 @@
 
 <script>
 import {projectTree} from '../../src/'
-import data from '../../data/data_project'
+import data0 from '../../data/data_project_small'
+import data1 from '../../data/data_project'
+import data2 from '../../data/data_project_1'
+import data3 from '../../data/data_project_2'
+
 export default {
   name: 'app',
   data () {
@@ -199,11 +215,36 @@ export default {
       gridMarginY: 50,
       clickableDefaultNodes: false,
       counter: false,
-      data
+      data: null,
+      dataCheck: '2'
+    }
+  },
+  beforeMount () {
+    if (this.dataCheck === '0') {
+      this.data = data0
+    } else if (this.dataCheck === '1') {
+      this.data = data1
+    } else if (this.dataCheck === '2') {
+      this.data = data2
+    } else if (this.dataCheck === '3') {
+      this.data = data3
     }
   },
   components: {
     projectTree
+  },
+  watch: {
+    dataCheck (value) {
+      if (value === '0') {
+        this.data = data0
+      } else if (value === '1') {
+        this.data = data1
+      } else if (value === '2') {
+        this.data = data2
+      } else if (value === '3') {
+        this.data = data3
+      }
+    }
   },
   methods: {
     do (action) {
@@ -236,10 +277,6 @@ export default {
     },
     onRetract (evt) {
       this.onEvent('onRetract', evt)
-    },
-    onEvent (eventName, data) {
-      this.events.push({eventName, data: data.data})
-      // console.log({eventName, data: data})
     },
     resetZoom () {
       this.isLoading = true
@@ -287,7 +324,7 @@ export default {
 }
 
 .tree {
-  height: 600px;
+  height: 500px;
   width: 100%;
 }
 
