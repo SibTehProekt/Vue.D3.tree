@@ -20,14 +20,14 @@
              :transform="node.style.transform"
              :class="node.className"
              ref="node"
-             @mousemove="mouseMoveNode($event, index, node, $refs.node[index])"
-             @mouseover="mouseOverNode($event, index, node, $refs.node[index])"
-             @mouseout="mouseOutNode($event, index, node, $refs.node[index])"
+             @mousemove="mouseMoveNode($event, index, node, $refs.node[index], $refs.circleNode[index])"
+             @mouseover="mouseOverNode($event, index, node, $refs.node[index], $refs.circleNode[index])"
+             @mouseout="mouseOutNode($event, index, node, $refs.node[index], $refs.circleNode[index])"
              @click="toggleNode($event, index, node)"
              @dblclick="onDblClickNode($event, index, node)"
              @contextmenu="contextMenuNode($event, index, node)">
 
-            <circle :r="node.r"></circle>
+            <circle :r="node.r" ref="circleNode"></circle>
             <text dx="0" :dy="radius <= 8 ? -10 : 3" text-anchor="middle" v-if="node.childrenExist">
               {{ node.obj.children ? node.obj.children.length : node.obj._children.length }}
             </text>
@@ -408,14 +408,14 @@ export default {
       e.stopPropagation()
       this.$emit('onClickNode', e, index, node)
     },
-    mouseMoveNode (e, index, node, el) {
-      this.$emit('mouseMoveNode', e, index, node, el)
+    mouseMoveNode (e, index, node, el, elCircle) {
+      this.$emit('mouseMoveNode', e, index, node, el, elCircle)
     },
-    mouseOverNode (e, index, node, el) {
-      this.$emit('mouseOverNode', e, index, node, el)
+    mouseOverNode (e, index, node, el, elCircle) {
+      this.$emit('mouseOverNode', e, index, node, el, elCircle)
     },
-    mouseOutNode (e, index, node, el) {
-      this.$emit('mouseOutNode', e, index, node, el)
+    mouseOutNode (e, index, node, el, elCircle) {
+      this.$emit('mouseOutNode', e, index, node, el, elCircle)
     },
     onDblClickNode (e, index, node) {
       e.stopPropagation()
