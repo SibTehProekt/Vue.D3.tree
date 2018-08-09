@@ -163,6 +163,8 @@
                    @contextMenuSpace="contextMenuSpace"
                    @moveSpace="moveSpace"
                    @mouseMoveNode="mouseMoveNode"
+                   @mouseOverNode="mouseOverNode"
+                   @mouseOutNode="mouseOutNode"
                    @retract="onRetract"/>
     </div>
 
@@ -297,6 +299,12 @@ export default {
       console.log(e)
     },
     mouseMoveNode (e) {
+      // console.log(e)
+    },
+    mouseOverNode (e) {
+      console.log(e)
+    },
+    mouseOutNode (e) {
       console.log(e)
     },
     moveSpace (g) {

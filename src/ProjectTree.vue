@@ -20,6 +20,8 @@
              :transform="node.style.transform"
              :class="node.className"
              @mousemove="mouseMoveNode($event, index, node)"
+             @mouseover="mouseOverNode($event, index, node)"
+             @mouseout="mouseOutNode($event, index, node)"
              @click="toggleNode($event, index, node)"
              @dblclick="onDblClickNode($event, index, node)"
              @contextmenu="contextMenuNode($event, index, node)">
@@ -407,6 +409,12 @@ export default {
     },
     mouseMoveNode (e, index, node) {
       this.$emit('mouseMoveNode', e, index, node)
+    },
+    mouseOverNode (e, index, node) {
+      this.$emit('mouseOverNode', e, index, node)
+    },
+    mouseOutNode (e, index, node) {
+      this.$emit('mouseOutNode', e, index, node)
     },
     onDblClickNode (e, index, node) {
       e.stopPropagation()
