@@ -19,9 +19,10 @@
              :opacity="node.style.opacity"
              :transform="node.style.transform"
              :class="node.className"
-             @mousemove="mouseMoveNode($event, index, node)"
-             @mouseover="mouseOverNode($event, index, node)"
-             @mouseout="mouseOutNode($event, index, node)"
+             ref="node"
+             @mousemove="mouseMoveNode($event, index, node, $refs.node[index])"
+             @mouseover="mouseOverNode($event, index, node, $refs.node[index])"
+             @mouseout="mouseOutNode($event, index, node, $refs.node[index])"
              @click="toggleNode($event, index, node)"
              @dblclick="onDblClickNode($event, index, node)"
              @contextmenu="contextMenuNode($event, index, node)">
@@ -407,14 +408,14 @@ export default {
       e.stopPropagation()
       this.$emit('onClickNode', e, index, node)
     },
-    mouseMoveNode (e, index, node) {
-      this.$emit('mouseMoveNode', e, index, node)
+    mouseMoveNode (e, index, node, el) {
+      this.$emit('mouseMoveNode', e, index, node, el)
     },
-    mouseOverNode (e, index, node) {
-      this.$emit('mouseOverNode', e, index, node)
+    mouseOverNode (e, index, node, el) {
+      this.$emit('mouseOverNode', e, index, node, el)
     },
-    mouseOutNode (e, index, node) {
-      this.$emit('mouseOutNode', e, index, node)
+    mouseOutNode (e, index, node, el) {
+      this.$emit('mouseOutNode', e, index, node, el)
     },
     onDblClickNode (e, index, node) {
       e.stopPropagation()
