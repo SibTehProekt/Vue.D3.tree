@@ -32,7 +32,7 @@
               {{ node.obj.children ? node.obj.children.length : node.obj._children.length }}
             </text>
             <text :dx="node.textpos.x" :dy="node.textpos.y":style="node.textStyle">{{ node.text }}</text>
-            <rect :x="-radius / 2" :y="-radius / 2" :width="radius" :height="radius" rx="50" fill="rgba(0,0,0,0)"/>
+            <rect :x="-radius * 1.5" :y="-radius * 1.5" :width="radius * 3" :height="radius * 3" rx="50" fill="rgba(0,0,0,1)"/>
 
           </g>
         <!--</transition-group>-->
