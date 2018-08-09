@@ -162,6 +162,7 @@
                    @onDblClickSpace="onDblClickSpace"
                    @contextMenuSpace="contextMenuSpace"
                    @moveSpace="moveSpace"
+                   @mouseMoveNode="mouseMoveNode"
                    @retract="onRetract"/>
     </div>
 
@@ -293,6 +294,9 @@ export default {
       console.log(e)
     },
     contextMenuSpace (e) {
+      console.log(e)
+    },
+    mouseMoveNode (e) {
       console.log(e)
     },
     moveSpace (g) {

@@ -14,8 +14,12 @@
         <!--</transition-group>-->
 
         <!--<transition-group tag="g" name="list">-->
-          <g v-for="(node, index) in nodes" :key="node.id" :opacity="node.style.opacity"
-             :transform="node.style.transform" :class="node.className"
+          <g v-for="(node, index) in nodes"
+             :key="node.id"
+             :opacity="node.style.opacity"
+             :transform="node.style.transform"
+             :class="node.className"
+             @mousemove="mouseMoveNode($event, index, node)"
              @click="toggleNode($event, index, node)"
              @dblclick="onDblClickNode($event, index, node)"
              @contextmenu="contextMenuNode($event, index, node)">
@@ -24,7 +28,8 @@
             <text dx="0" :dy="radius <= 8 ? -10 : 3" text-anchor="middle" v-if="node.childrenExist">
               {{ node.obj.children ? node.obj.children.length : node.obj._children.length }}
             </text>
-            <text :dx="node.textpos.x" :dy="node.textpos.y" :style="node.textStyle">{{ node.text }}</text>
+            <text :dx="node.textpos.x" :dy="node.textpos.y":style="node.textStyle">{{ node.text }}</text>
+            <rect :x="-radius * 5" :y="-radius * 5" :width="radius * 10" :height="radius * 10" rx="50" fill="rgba(0,0,0,0)"/>
 
           </g>
         <!--</transition-group>-->
@@ -399,6 +404,9 @@ export default {
       }
       e.stopPropagation()
       this.$emit('onClickNode', e, index, node)
+    },
+    mouseMoveNode (e, index, node) {
+      this.$emit('mouseMoveNode', e, index, node)
     },
     onDblClickNode (e, index, node) {
       e.stopPropagation()
