@@ -19,15 +19,15 @@
              :opacity="node.style.opacity"
              :transform="node.style.transform"
              :class="node.className"
-             ref="node"
-             @mousemove="mouseMoveNode($event, index, node, $refs.node[index], $refs.circleNode[index])"
-             @mouseover="mouseOverNode($event, index, node, $refs.node[index], $refs.circleNode[index])"
-             @mouseout="mouseOutNode($event, index, node, $refs.node[index], $refs.circleNode[index])"
+             :ref="'node' + index"
+             @mousemove="mouseMoveNode($event, index, node)"
+             @mouseover="mouseOverNode($event, index, node)"
+             @mouseout="mouseOutNode($event, index, node)"
              @click="toggleNode($event, index, node)"
              @dblclick="onDblClickNode($event, index, node)"
              @contextmenu="contextMenuNode($event, index, node)">
 
-            <circle :r="node.r" ref="circleNode"></circle>
+            <circle :r="node.r" :ref="'circle' + index"></circle>
             <text dx="0" :dy="radius <= 8 ? -10 : 3" text-anchor="middle" v-if="node.childrenExist">
               {{ node.obj.children ? node.obj.children.length : node.obj._children.length }}
             </text>
@@ -408,13 +408,19 @@ export default {
       e.stopPropagation()
       this.$emit('onClickNode', e, index, node)
     },
-    mouseMoveNode (e, index, node, el, elCircle) {
+    mouseMoveNode (e, index, node) {
+      let el = this.$refs['node' + index][0]
+      let elCircle = this.$refs['circle' + index][0]
       this.$emit('mouseMoveNode', e, index, node, el, elCircle)
     },
-    mouseOverNode (e, index, node, el, elCircle) {
+    mouseOverNode (e, index, node) {
+      let el = this.$refs['node' + index][0]
+      let elCircle = this.$refs['circle' + index][0]
       this.$emit('mouseOverNode', e, index, node, el, elCircle)
     },
-    mouseOutNode (e, index, node, el, elCircle) {
+    mouseOutNode (e, index, node) {
+      let el = this.$refs['node' + index][0]
+      let elCircle = this.$refs['circle' + index][0]
       this.$emit('mouseOutNode', e, index, node, el, elCircle)
     },
     onDblClickNode (e, index, node) {
