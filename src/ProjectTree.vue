@@ -1,6 +1,6 @@
 <template>
   <div>
-    <svg :width="width" :height="height" v-if="render" ref="svgTree"
+    <svg :width="width" :height="height" v-if="!dataIsEmpty && render" ref="svgTree"
          @click="clickSpace"
          @dblclick="onDblClickSpace"
          @contextmenu="contextMenuSpace">
@@ -14,18 +14,31 @@
         <!--</transition-group>-->
 
         <!--<transition-group tag="g" name="list">-->
-          <g v-for="(node, index) in nodes" :key="node.id" :opacity="node.style.opacity"
-             :transform="node.style.transform" :class="node.className"
+          <g v-for="(node, index) in nodes"
+             :key="node.id"
+             :opacity="node.style.opacity"
+             :transform="node.style.transform"
+             :class="node.className"
+             @mousemove="mouseMoveNode($event, index, node)"
+             @mouseover="mouseOverNode($event, index, node)"
+             @mouseout="mouseOutNode($event, index, node)"
              @click="toggleNode($event, index, node)"
              @dblclick="onDblClickNode($event, index, node)"
              @contextmenu="contextMenuNode($event, index, node)">
 
             <circle :r="node.r"></circle>
-            <text :dx="node.textpos.x" :dy="node.textpos.y" :style="node.textStyle">{{ node.text }}</text>
+            <text dx="0" :dy="radius <= 8 ? -10 : 3" text-anchor="middle" v-if="node.childrenExist">
+              {{ node.obj.children ? node.obj.children.length : node.obj._children.length }}
+            </text>
+            <text :dx="node.textpos.x" :dy="node.textpos.y":style="node.textStyle">{{ node.text }}</text>
+            <rect :x="-radius * 1.5" :y="-radius * 1.5" :width="radius * 3" :height="radius * 3" rx="50" fill="rgba(0,0,0,0)"/>
 
           </g>
         <!--</transition-group>-->
       </g>
+    </svg>
+    <svg :width="width" :height="height" ref="dataisempty" v-else-if="render">
+      <text :x="$el.clientWidth / 2" :y="$el.clientHeight / 2" text-anchor="middle">{{ noDataText }}</text>
     </svg>
   </div>
 </template>
@@ -35,7 +48,7 @@ import euclidean from './euclidean-layout'
 import circular from './circular-layout'
 import {compareString, toPromise, translate} from './d3-utils'
 import * as d3 from 'd3'
-import {cloneDeep} from 'lodash'
+import {isEmpty, cloneDeep} from 'lodash'
 
 const layout = {
   euclidean,
@@ -145,6 +158,14 @@ const props = {
   clickableDefaultNodes: {
     type: Boolean,
     default: true
+  },
+  noDataText: {
+    type: String,
+    default: 'Data not available'
+  },
+  counter: {
+    type: Boolean,
+    default: false
   }
 }
 
@@ -171,11 +192,27 @@ export default {
           y2: 100
         }
       },
-      minMargin: 100
+      minMargin: 0,
+      zoom: {
+        x: 0,
+        y: 0,
+        scale: 1
+      },
+      history: {
+        nodes: [],
+        zoom: {
+          x: 0,
+          y: 0,
+          scale: 1
+        }
+      },
+      activeCast: {}
     }
   },
   beforeMount () {
-    this.addFields(this.innerData)
+    if (!this.dataIsEmpty && typeof this.innerData.children !== 'undefined') {
+      this.addFields(this.innerData)
+    }
   },
   updated: function () {
     this.$nextTick(function () {
@@ -183,22 +220,56 @@ export default {
     })
   },
   mounted () {
-    this.update()
-    this.$nextTick(() => {
+    let svg = null
+    let zoom = null
+    this.$nextTick().then(() => {
+      this.update()
       this.render = !this.render
-      this.$nextTick(() => {
-        if (this.zoomable) {
-          const svg = d3.select(this.$refs.svgTree)
-          let zoom = d3.zoom().scaleExtent([this.zoomMin, this.zoomMax]).on('zoom', this.zoomed(svg.select('g')))
-          svg.call(zoom).on('wheel', () => d3.event.preventDefault())
-          svg.call(zoom.transform, d3.zoomIdentity)
+    }).then(() => {
+      this.updateLines()
+      if (this.zoomable) {
+        svg = d3.select(this.$refs.svgTree)
+        zoom = d3.zoom().scaleExtent([this.zoomMin, this.zoomMax]).on('zoom', this.zoomed(svg.select('g')))
+      }
+    }).then(() => {
+      if (this.zoomable) {
+        if (!this.dataIsEmpty && !this.dataNotChildren) {
+          this.computeZoom()
         }
-        this.updateLines()
-      })
+        svg.call(zoom).on('wheel', () => d3.event.preventDefault())
+        svg.call(zoom.transform, !this.dataIsEmpty && !this.dataNotChildren ? this.getDefaultZoom() : d3.zoomIdentity)
+      }
+    }).then(() => {
+      this.genActiveCast()
     })
   },
 
   methods: {
+    getDefaultZoom () {
+      return d3.zoomIdentity.translate(this.zoom.x, this.zoom.y).scale(this.zoom.scale)
+    },
+    computeZoom () {
+      let tree = this.$refs.svgTree
+      let main = this.$refs.main
+      let pw = d3.select('path').node().getBBox().width
+
+      let scaleByWidth = tree.clientWidth / ((main.getBBox().width + pw / 2))
+      let scaleByHeight = tree.clientHeight / (main.getBBox().height + this.gridMarginY * 2)
+      let scale = scaleByWidth > scaleByHeight ? scaleByHeight : scaleByWidth
+      scale = scale < this.zoomMin ? this.zoomMin : (scale > this.zoomMax ? this.zoomMax : scale)
+
+      let x = tree.clientWidth / 2
+      x += (pw / 2 + this.getMaxDepth()) * scale // встаем в начало сетки
+      x -= pw * (this.depth + 1) * scale / 2 // отнимаем половину растояния сетки, чтобы встать в центр сетки
+
+      let y = this.getMaxDepth() * this.diameter * scale
+      y += (tree.clientHeight / 2 - main.getBBox().height / 2 * scale)
+      y -= this.gridMarginY / 2 * scale
+
+      this.zoom.scale = scale
+      this.zoom.x = x
+      this.zoom.y = y
+    },
     update () {
       this.tree = this.initLayout()
     },
@@ -210,6 +281,15 @@ export default {
       this.cleanTmpAutoMarginCounter()
       this.addFields(this.innerData)
       this.update()
+
+      this.$nextTick().then(() => {
+        this.$nextTick(() => {
+          if (!this.dataIsEmpty && !this.dataNotChildren) {
+            this.computeZoom()
+          }
+          this.resetZoom()
+        })
+      })
     },
     initLayout () {
       const size = this.getSize()
@@ -245,6 +325,7 @@ export default {
     updateTransform (g, size) {
       size = size || this.getSize()
       const margin = this.margin(this.autoMarginY, this.autoMarginX)
+      this.$emit('moveSpace', g, size)
       return this.layout.updateTransform(g, margin, size, this.maxTextLenght)
     },
     zoomed (g) {
@@ -263,7 +344,9 @@ export default {
       const svg = d3.select(this.$refs.svgTree)
       let zoom = d3.zoom().scaleExtent([this.zoomMin, this.zoomMax]).on('zoom', this.zoomed(svg.select('g')))
       const transitionPromise = toPromise(
-        svg.transition().duration(this.duration).call(zoom.transform, () => d3.zoomIdentity)
+        svg.transition().duration(this.duration).call(zoom.transform, () => {
+          return !this.dataIsEmpty && !this.dataNotChildren ? this.getDefaultZoom() : d3.zoomIdentity
+        })
       )
       return transitionPromise.then(() => true)
     },
@@ -290,24 +373,21 @@ export default {
         y: autoMarginY ? this.getAutoMarginY() : this.marginY
       }
     },
-    getAutoMarginY () {
+    getMaxDepth () {
       let max = 0
       for (let item in this.tmp.automargin.counter) {
         if (this.tmp.automargin.counter[item] > max) {
           max = this.tmp.automargin.counter[item]
         }
       }
-      let marginY = max * (this.radius * 2) * this.coefficientY
+      return max
+    },
+    getAutoMarginY () {
+      let marginY = this.getMaxDepth() * this.diameter * this.coefficientY
       return this.culcMargin(marginY)
     },
     getAutoMarginX () {
-      let max = 0
-      for (let item in this.tmp.automargin.counter) {
-        if (this.tmp.automargin.counter[item] > max) {
-          max = this.tmp.automargin.counter[item]
-        }
-      }
-      let marginX = max / 10 * this.radius * this.coefficientY
+      let marginX = this.getMaxDepth() / 10 * this.radius * this.coefficientY
       return this.culcMargin(marginX)
     },
     culcMargin (margin) {
@@ -319,9 +399,51 @@ export default {
       }
     },
 
+    genActiveCast () {
+      return this._generationActiveCast(this.innerData, this.activeCast)
+    },
+
+    _generationActiveCast (dataTree, activeCast) {
+      if (dataTree.childrenExist && dataTree.children !== null) {
+        activeCast.id = dataTree.instanceId
+        activeCast.children = []
+        for (let child of dataTree.children) {
+          if (child.childrenExist && child.children !== null) {
+            let tmp = {}
+            activeCast.children.push(this._generationActiveCast(child, tmp))
+          }
+        }
+        return activeCast
+      }
+    },
+
+    execActiveCast () {
+      this._execActiveCast(this.innerData, this.activeCast)
+    },
+
+    _execActiveCast (dataTree, activeCast) {
+      if (typeof dataTree.children !== 'undefined' && typeof dataTree._children !== 'undefined') {
+        if (dataTree.instanceId === activeCast.id) {
+          dataTree.children = dataTree._children
+          dataTree._children = null
+        } else {
+          dataTree._children = dataTree.children
+          dataTree.children = null
+        }
+
+        for (let child of dataTree.children) {
+          for (let activeChild of activeCast.children) {
+            if (child.childrenExist && child.children !== null) {
+              this._execActiveCast(child, activeChild)
+            }
+          }
+        }
+      }
+    },
+
     // методы - обработки событий
     toggleNode (e, index, node) {
-      if ((this.clickableDefaultNodes || node.deep >= this.deep) && node.childrenExist && node.parentExist) {
+      if ((this.clickableDefaultNodes || node.deep >= this.deep) && node.childrenExist && !isEmpty(node.parent)) {
         let dataNode = this.searchNode(this.innerData, node.id)
         if (dataNode.children !== null) {
           this.tmp.automargin.counter[dataNode.deep + 1] -= dataNode.children.length
@@ -333,9 +455,23 @@ export default {
           dataNode._children = null
         }
         this.update()
+        this.$nextTick(() => {
+          if (!this.dataIsEmpty && !this.dataNotChildren) {
+            this.computeZoom()
+          }
+        })
       }
       e.stopPropagation()
       this.$emit('onClickNode', e, index, node)
+    },
+    mouseMoveNode (e, index, node) {
+      this.$emit('mouseMoveNode', e, index, node)
+    },
+    mouseOverNode (e, index, node) {
+      this.$emit('mouseOverNode', e, index, node)
+    },
+    mouseOutNode (e, index, node) {
+      this.$emit('mouseOutNode', e, index, node)
     },
     onDblClickNode (e, index, node) {
       e.stopPropagation()
@@ -358,7 +494,7 @@ export default {
 
   computed: {
     root () {
-      if (this.innerData) {
+      if (!this.dataIsEmpty) {
         return this.tree(d3.hierarchy(this.innerData).sort((a, b) => {
           return compareString(a.data.text, b.data.text)
         }))
@@ -366,7 +502,7 @@ export default {
       return null
     },
     nodes () {
-      if (this.root) {
+      if (!this.dataIsEmpty && this.root) {
         this.depth = 0
         return this.root.descendants().map(d => {
           if (this.depth < d.depth) {
@@ -375,15 +511,27 @@ export default {
 
           let className = 'nodetree' +
             (d.children && d.children !== null ? ' node--internal-opened' : ' node--internal-closed') +
+            (!d.data.childrenExist ? ' node--not-children' : '') +
             (!d.data.childrenExist || d.parent === null || (this.hideDeepNodes && !d.data.clicking)
               ? ' node--notclick' : '')
+
+          let parent = Object.assign({}, d.parent)
+
+          if (typeof parent.children !== 'undefined') {
+            delete parent.children
+          }
+
+          if (typeof parent._children !== 'undefined') {
+            delete parent._children
+          }
 
           return {
             id: d.data.id,
             r: this.radius,
             className: className,
             childrenExist: d.data.childrenExist,
-            parentExist: d.parent !== null,
+            parent: parent,
+            obj: d.data,
             text: d.data.name,
             deep: d.data.deep,
             style: {
@@ -402,7 +550,7 @@ export default {
       }
     },
     links () {
-      if (this.root) {
+      if (!this.dataIsEmpty && this.root) {
         return this.root.descendants().slice(1).map((d) => {
           let y1 = d.y
           let x1 = d.x
@@ -421,11 +569,13 @@ export default {
       }
     },
     lines () {
-      if (this.$refs.main && this.grid) {
+      if (!this.dataIsEmpty && typeof this.innerData.children !== 'undefined' && this.$refs.main && this.grid) {
         let mainEl = d3.select(this.$refs.main)
         let lines = []
-        let w = mainEl.select('path').node().getBBox().width
-        let x = w / 2
+        let path = mainEl.select('path')
+        let w = path.node().getBBox().width
+        let hfW = w / 2
+        let x = hfW
         let y1 = null
         let y2 = 0
         for (let node of mainEl.selectAll('path').nodes()) {
@@ -434,9 +584,19 @@ export default {
           let y = box.y + box.height
           if (y2 < y) y2 = y
         }
+        lines.push({
+          tx: 0,
+          ty: 0,
+          text: '',
+          x1: -hfW,
+          y1: y1 - this.gridMarginY,
+          x2: -hfW,
+          y2: y2 + this.gridMarginY,
+          className: 'linktree'
+        })
         for (let i = 0; i <= this.depth; i++) {
           lines.push({
-            tx: x - (w / 2),
+            tx: x - hfW,
             ty: y1 - this.gridMarginY,
             text: this.sections[i],
             x1: x,
@@ -453,12 +613,22 @@ export default {
     },
     layout () {
       return layout[this.layoutType]
+    },
+    dataIsEmpty () {
+      return isEmpty(this.innerData)
+    },
+    dataNotChildren () {
+      return typeof this.innerData.children === 'undefined'
+    },
+    diameter () {
+      return this.radius * 2
     }
   },
 
   watch: {
     data (current, old) {
-      this.onData(current)
+      this.upgrade()
+      // this.onData(current)
     },
 
     type () {
@@ -507,7 +677,7 @@ export default {
 }
 </script>
 
-<style>
+<style scoped>
 svg {
   transform: translate3d(0, 0, 0);
   backface-visibility: hidden;
@@ -518,44 +688,48 @@ svg * {
   will-change: transform;
 }
 
-.treeclass .nodetree  circle {
+.nodetree  circle {
   fill: rgb(255, 255, 255);
   stroke: steelblue;
   stroke-width: 1.5px;
 }
 
-.treeclass .node--notclick circle {
+.node--notclick circle {
   cursor: default !important;
 }
 
-.treeclass .node--internal-opened  circle {
+.node--not-children circle {
+  fill: rgb(255, 255, 255) !important;
+}
+
+.node--internal-opened  circle {
   fill: rgb(255, 255, 255);
   cursor: pointer;
 }
 
-.treeclass .node--internal-closed circle {
+.node--internal-closed circle {
   fill:  rgb(176, 196, 222);
   cursor: pointer;
 }
 
-.treeclass .nodetree {
+.nodetree {
   /*transition: all 1s;*/
 }
 
-.treeclass .nodetree text {
+.nodetree text {
   font: 10px sans-serif;
   cursor: pointer;
 }
 
-.treeclass .nodetree.selected text {
+.nodetree.selected text {
   font-weight: bold;
 }
 
-.treeclass .node--internal text {
+.node--internal text {
   text-shadow: 0 1px 0 #fff, 0 -1px 0 #fff, 1px 0 0 #fff, -1px 0 0 #fff;
 }
 
-.treeclass .linktree {
+.linktree {
   fill: none;
   stroke: #555;
   stroke-opacity: 0.4;

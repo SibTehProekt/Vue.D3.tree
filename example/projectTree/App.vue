@@ -1,12 +1,17 @@
 <template>
   <div id="app" class="container-fluid">
-    <div class="col-md-3">
+    <div class="col-md-3" v-if="showToolbar">
 
       <div class="panel panel-default">
         <div class="panel-heading">Props</div>
 
         <div class="panel-body">
             <div class="form-horizontal">
+
+            <div class="form-group">
+              <label for="counter" class="control-label">Counter</label>
+              <input type="checkbox" id="counter" v-model="counter"/>
+            </div>
 
             <div class="form-group">
               <label for="clickable" class="control-label">Clickable deep nodes</label>
@@ -21,6 +26,19 @@
             <div class="form-group">
               <label for="grid" class="control-label">Grid</label>
               <input type="checkbox" id="grid" v-model="grid"/>
+            </div>
+
+            <div class="form-group">
+              <label for="dataCheck" class="control-label col-sm-3">Data</label>
+              <div  class="col-sm-9">
+                <select id="dataCheck" class="form-control" v-model="dataCheck">
+                  <option value="0">data 1 small</option>
+                  <option value="1">data 1</option>
+                  <option value="2">data 2</option>
+                  <option value="3">data 3</option>
+                  <option value="4">data 4</option>
+                </select>
+              </div>
             </div>
 
             <div class="form-group">
@@ -101,84 +119,73 @@
             </div>
 
             <div class="form-group">
-              <span v-if="currentNode">Current Node: {{currentNode.data.text}}</span>
-              <span v-else>No Node selected.</span>
-               <i v-if="isLoading" class="fa fa-spinner fa-spin fa-2x fa-fw"></i>
+              <label for="velocity" class="control-label col-sm-16">Active cast</label>
+              <div class="col-sm-16">
+                <button class="btn btn-primary" @click="genActiveCast()">gen</button>
+                <button class="btn btn-warning" @click="execActiveCast()">exec</button>
+              </div>
             </div>
 
-            <button type="button" :disabled="!currentNode" class="btn btn-primary" @click="expandAll" data-toggle="tooltip" data-placement="top" title="Expand All from current">
-            <i class="fa fa-expand" aria-hidden="true"></i>
-            </button>
-
-            <button type="button" :disabled="!currentNode" class="btn btn-secondary" @click="collapseAll" data-toggle="tooltip" data-placement="top" title="Collapse All from current">
-            <i class="fa fa-compress" aria-hidden="true"></i>
-            </button>
-
-            <button type="button" :disabled="!currentNode" class="btn btn-success" @click="showOnly" data-toggle="tooltip" data-placement="top" title="Show Only from current">
-            <i class="fa fa-search-plus" aria-hidden="true"></i>
-            </button>
-
-            <button type="button" :disabled="!currentNode" class="btn btn-warning" @click="show" data-toggle="tooltip" data-placement="top" title="Show current">
-            <i class="fa fa-binoculars" aria-hidden="true"></i>
-            </button>
-
-            <button v-if="zoomable" type="button" class="btn btn-warning" @click="resetZoom" data-toggle="tooltip" data-placement="top" title="Reset Zoom">
-            <i class="fa fa-arrows-alt" aria-hidden="true"></i>
-            </button>
-
-        </div>
-
-        <div class="panel panel-default">
-          <div class="panel-heading">Events</div>
-
-          <div class="panel-body log">
-            <div v-for="(event,index) in events" :key="index">
-              <p><b>Name:</b> {{event.eventName}} <b>Data:</b>{{event.data.text}}</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="col-md-9 panel panel-default">
-    <projectTree ref="tree"
-                 :identifier="getId"
-                 :zoomable="zoomable"
-                 :data="data"
-                 :node-text="nodeText"
-                 :margin-x="Marginx"
-                 :margin-y="Marginy"
-                 :autoMarginY="autoMarginY"
-                 :autoMarginX="autoMarginX"
-                 :radius="radius"
-                 :type="type"
-                 :layout-type="layoutType"
-                 :duration="duration"
-                 :grid="grid"
-                 :deep="(deep < 1 ? 1 : deep)"
-                 :hideDeepNodes="hideDeepNodes"
-                 :gridMarginY="gridMarginY"
-                 :clickableDefaultNodes="clickableDefaultNodes"
-                 :sections="['Проект', 'Сборки', 'Стадии', 'Разделы', 'Блоки', 'Задачи']"
-                 class="viewport treeclass tree"
-                 @clicked="onClick"
-                 @expand="onExpand"
-                 @onClickNode="onClickNode"
-                 @onDblClickNode="onDblClickNode"
-                 @contextMenuNode="contextMenuNode"
-                 @clickSpace="clickSpace"
-                 @onDblClickSpace="onDblClickSpace"
-                 @contextMenuSpace="contextMenuSpace"
-                 @retract="onRetract"/>
-  </div>
+    <div class="panel panel-default" :class="showToolbar ? 'col-md-9' : ''">
+      <div class="toolbar">
+        <button class="btn btn-primary" @click="toggleToollbar"><i class="fa fa-wrench" aria-hidden="true"></i></button>
+        <button class="btn btn-warning" @click="update">upload</button>
+        <button class="btn btn-warning" @click="reboot">reload</button>
+        <button v-if="zoomable" type="button" class="btn btn-warning" @click="resetZoom" data-toggle="tooltip" data-placement="top" title="Reset Zoom">
+          <i class="fa fa-arrows-alt" aria-hidden="true"></i>
+        </button>
+      </div>
+      <projectTree ref="tree"
+                   :identifier="getId"
+                   :counter="counter"
+                   :zoomable="zoomable"
+                   :data="data"
+                   :node-text="nodeText"
+                   :margin-x="Marginx"
+                   :margin-y="Marginy"
+                   :autoMarginY="autoMarginY"
+                   :autoMarginX="autoMarginX"
+                   :radius="radius"
+                   :type="type"
+                   :layout-type="layoutType"
+                   :duration="duration"
+                   :grid="grid"
+                   :deep="(deep < 1 ? 1 : deep)"
+                   :hideDeepNodes="hideDeepNodes"
+                   :gridMarginY="gridMarginY"
+                   :clickableDefaultNodes="clickableDefaultNodes"
+                   :sections="['Проект', 'Сборки', 'Стадии', 'Разделы', 'Блоки', 'Задачи']"
+                   class="viewport treeclass tree"
+                   @clicked="onClick"
+                   @expand="onExpand"
+                   @onClickNode="onClickNode"
+                   @onDblClickNode="onDblClickNode"
+                   @contextMenuNode="contextMenuNode"
+                   @clickSpace="clickSpace"
+                   @onDblClickSpace="onDblClickSpace"
+                   @contextMenuSpace="contextMenuSpace"
+                   @moveSpace="moveSpace"
+                   @mouseMoveNode="mouseMoveNode"
+                   @mouseOverNode="mouseOverNode"
+                   @mouseOutNode="mouseOutNode"
+                   @retract="onRetract"/>
+    </div>
 
   </div>
 </template>
 
 <script>
 import {projectTree} from '../../src/'
-import data from '../../data/data_project'
+import data0 from '../../data/data_project_small'
+import data1 from '../../data/data_project'
+import data2 from '../../data/data_project_1'
+import data3 from '../../data/data_project_2'
+import data4 from '../../data/data_project_3'
 
 export default {
   name: 'app',
@@ -202,11 +209,42 @@ export default {
       deep: 2,
       gridMarginY: 50,
       clickableDefaultNodes: false,
-      data
+      counter: false,
+      data: null,
+      dataCheck: '1',
+      showToolbar: true
+    }
+  },
+  beforeMount () {
+    if (this.dataCheck === '0') {
+      this.data = data0
+    } else if (this.dataCheck === '1') {
+      this.data = data1
+    } else if (this.dataCheck === '2') {
+      this.data = data2
+    } else if (this.dataCheck === '3') {
+      this.data = data3
+    } else if (this.dataCheck === '4') {
+      this.data = data4
     }
   },
   components: {
     projectTree
+  },
+  watch: {
+    dataCheck (value) {
+      if (value === '0') {
+        this.data = data0
+      } else if (value === '1') {
+        this.data = data1
+      } else if (value === '2') {
+        this.data = data2
+      } else if (value === '3') {
+        this.data = data3
+      } else if (value === '4') {
+        this.data = data4
+      }
+    }
   },
   methods: {
     do (action) {
@@ -217,6 +255,14 @@ export default {
     },
     getId (node) {
       return node.id
+    },
+    execActiveCast () {
+      console.log('exec')
+      this.$refs.tree.execActiveCast()
+    },
+    genActiveCast () {
+      console.log('gen')
+      this.$refs.tree.genActiveCast()
     },
     expandAll () {
       this.do('expandAll')
@@ -240,37 +286,54 @@ export default {
     onRetract (evt) {
       this.onEvent('onRetract', evt)
     },
-    onEvent (eventName, data) {
-      this.events.push({eventName, data: data.data})
-      // console.log({eventName, data: data})
-    },
     resetZoom () {
       this.isLoading = true
       this.$refs['tree'].resetZoom().then(() => { this.isLoading = false })
     },
     onClickNode (e, index, node) {
-      console.log(e)
-      console.log(index)
-      console.log(node)
+      // console.log(e)
+      // console.log(index)
+      // console.log(node)
     },
     onDblClickNode (e, index, node) {
-      console.log(e)
-      console.log(index)
-      console.log(node)
+      // console.log(e)
+      // console.log(index)
+      // console.log(node)
     },
     contextMenuNode (e, index, node) {
-      console.log(e)
-      console.log(index)
-      console.log(node)
+      // console.log(e)
+      // console.log(index)
+      // console.log(node)
     },
     clickSpace (e) {
-      console.log(e)
+      // console.log(e)
     },
     onDblClickSpace (e) {
-      console.log(e)
+      // console.log(e)
     },
     contextMenuSpace (e) {
-      console.log(e)
+      // console.log(e)
+    },
+    mouseMoveNode (e) {
+      // console.log(e)
+    },
+    mouseOverNode (e) {
+      // console.log(e)
+    },
+    mouseOutNode (e) {
+      // console.log(e)
+    },
+    moveSpace (g) {
+      // console.log(g)
+    },
+    toggleToollbar () {
+      this.showToolbar = !this.showToolbar
+    },
+    update () {
+      this.$refs.tree.update()
+    },
+    reboot () {
+      this.$refs.tree.upgrade()
     }
   }
 }
@@ -286,8 +349,19 @@ export default {
   margin-top: 20px;
 }
 
+.panel-default {
+  position: relative;
+}
+
+.toolbar {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 99999999;
+}
+
 .tree {
-  height: 900px;
+  height: 600px;
   width: 100%;
 }
 
