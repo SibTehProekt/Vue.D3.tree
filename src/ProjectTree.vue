@@ -206,11 +206,13 @@ export default {
           scale: 1
         }
       },
-      activeCast: {}
+      snapshotOpenNodes: {}
     }
   },
   beforeMount () {
     if (!this.dataIsEmpty && typeof this.innerData.children !== 'undefined') {
+      // Добавление нужных полей и т.д.
+      // Можно сказать нормализация дерева для дальнейшей работы
       this.addFields(this.innerData)
     }
   },
@@ -219,6 +221,9 @@ export default {
       this.updateLines()
     })
   },
+  /**
+   * @package d3
+   */
   mounted () {
     let svg = null
     let zoom = null
@@ -240,14 +245,23 @@ export default {
         svg.call(zoom.transform, !this.dataIsEmpty && !this.dataNotChildren ? this.getDefaultZoom() : d3.zoomIdentity)
       }
     }).then(() => {
-      this.genActiveCast()
+      this.createSnapshotOfOpenNodes()
     })
   },
 
   methods: {
+    /**
+     * @package d3
+     */
     getDefaultZoom () {
       return d3.zoomIdentity.translate(this.zoom.x, this.zoom.y).scale(this.zoom.scale)
     },
+
+    /**
+     * Просчет зума
+     *
+     * @package d3
+     */
     computeZoom () {
       let tree = this.$refs.svgTree
       let main = this.$refs.main
@@ -270,12 +284,15 @@ export default {
       this.zoom.x = x
       this.zoom.y = y
     },
+
     update () {
       this.tree = this.initLayout()
     },
+
     updateLines () {
       this.tmp.lines = this.lines
     },
+
     upgrade () {
       this.innerData = cloneDeep(this.data)
       this.cleanTmpAutoMarginCounter()
@@ -291,6 +308,13 @@ export default {
         })
       })
     },
+
+    /**
+     * Инициализация шаблона
+     *
+     * @package d3
+     * @return
+     */
     initLayout () {
       const size = this.getSize()
       const tree = this.type === 'cluster' ? d3.cluster() : d3.tree()
@@ -298,36 +322,80 @@ export default {
       this.layout.size(tree, size, margin, this.maxTextLenght)
       return tree
     },
+
+    /**
+     * Добавление дополнительных полей для дерева
+     * Так же закрытие нод с дочерними элементами относительно указанной глубины deep
+     *
+     * @param dataNode
+     * @param deep
+     *
+     * @return void
+     */
     addFields (dataNode, deep = 0) {
       if (typeof this.tmp.automargin.counter[deep] === 'undefined') {
         this.tmp.automargin.counter[deep] = 0
       }
+
+      // само добавление полей
       dataNode.childrenExist = (typeof dataNode.children !== 'undefined')
       dataNode.clicking = this.hideDeepNodes && this.deep <= deep
       dataNode.deep = deep
-      if (!this.hideDeepNodes || this.deep >= deep) this.tmp.automargin.counter[deep]++
+      dataNode._children = null
+
+      if (!this.hideDeepNodes || this.deep >= deep) {
+        // коунтирвание для просчета маргина
+        this.tmp.automargin.counter[deep]++
+      }
+
       if (typeof dataNode.children !== 'undefined' && Array.isArray(dataNode.children)) {
         deep++
         for (let child of dataNode.children) {
           this.addFields(child, deep)
         }
       }
+
+      // закрытие всех нод находящихся ниже по дереву относительно указанной глубины deep
       if (this.hideDeepNodes && this.deep < deep) {
-        dataNode._children = dataNode.children
-        dataNode.children = null
+        this.closeNode(dataNode)
       }
     },
+
     getSize () {
       let width = this.$el.clientWidth
       let height = this.$el.clientHeight
       return { width, height }
     },
+
+    openNode (dataTree) {
+      if (typeof dataTree._children !== 'undefined' && !isEmpty(dataTree._children)) {
+        dataTree.children = dataTree._children
+        dataTree._children = null
+      }
+    },
+
+    closeNode (dataTree) {
+      if (typeof dataTree.children !== 'undefined' && !isEmpty(dataTree.children)) {
+        dataTree._children = dataTree.children
+        dataTree.children = null
+      }
+    },
+
+    isOpenNode (dataTree) {
+      return !isEmpty(dataTree.children)
+    },
+
+    hasChildrenNode (dataTree) {
+      return dataTree.childrenExist
+    },
+
     updateTransform (g, size) {
       size = size || this.getSize()
       const margin = this.margin(this.autoMarginY, this.autoMarginX)
       this.$emit('moveSpace', g, size)
       return this.layout.updateTransform(g, margin, size, this.maxTextLenght)
     },
+
     zoomed (g) {
       return () => {
         const transform = d3.event.transform
@@ -337,6 +405,7 @@ export default {
         g.attr('transform', transformToApply)
       }
     },
+
     resetZoom () {
       if (!this.zoomable) {
         return Promise.resolve(false)
@@ -350,6 +419,7 @@ export default {
       )
       return transitionPromise.then(() => true)
     },
+
     searchNode (dataNode, id) {
       if (dataNode.id === id) {
         return dataNode
@@ -364,15 +434,18 @@ export default {
       }
       return null
     },
+
     select: (index, node) => {
       this.selected = index
     },
+
     margin (autoMarginY = false, autoMarginX = false) {
       return {
         x: autoMarginX ? this.getAutoMarginX() : this.marginX,
         y: autoMarginY ? this.getAutoMarginY() : this.marginY
       }
     },
+
     getMaxDepth () {
       let max = 0
       for (let item in this.tmp.automargin.counter) {
@@ -382,78 +455,91 @@ export default {
       }
       return max
     },
+
     getAutoMarginY () {
       let marginY = this.getMaxDepth() * this.diameter * this.coefficientY
       return this.culcMargin(marginY)
     },
+
     getAutoMarginX () {
       let marginX = this.getMaxDepth() / 10 * this.radius * this.coefficientY
       return this.culcMargin(marginX)
     },
+
     culcMargin (margin) {
       return -(margin > this.minMargin ? margin : this.minMargin)
     },
+
     cleanTmpAutoMarginCounter () {
       for (let i in this.tmp.automargin.counter) {
         this.tmp.automargin.counter[i] = undefined
       }
     },
 
-    genActiveCast () {
-      return this._generationActiveCast(this.innerData, this.activeCast)
+    /**
+     * Создание слепка открытых нод ()
+     */
+    createSnapshotOfOpenNodes () {
+      return this._createSnapshotOfOpenNodes(this.innerData, this.snapshotOpenNodes)
     },
 
-    _generationActiveCast (dataTree, activeCast) {
+    /**
+     * Рекурсивный внутренний метод для создания слепка открытых нод
+     */
+    _createSnapshotOfOpenNodes (dataTree, activeCast) {
       if (dataTree.childrenExist && dataTree.children !== null) {
         activeCast.id = dataTree.instanceId
         activeCast.children = []
         for (let child of dataTree.children) {
           if (child.childrenExist && child.children !== null) {
             let tmp = {}
-            activeCast.children.push(this._generationActiveCast(child, tmp))
+            activeCast.children.push(this._createSnapshotOfOpenNodes(child, tmp))
           }
         }
         return activeCast
       }
     },
 
-    execActiveCast () {
-      this._execActiveCast(this.innerData, this.activeCast)
+    printSnapshotOfOpenNodes () {
+      this.upgrade()
+      this._printSnapshotOfOpenNodes(this.innerData, this.snapshotOpenNodes)
     },
 
-    _execActiveCast (dataTree, activeCast) {
-      if (typeof dataTree.children !== 'undefined' && typeof dataTree._children !== 'undefined') {
-        if (dataTree.instanceId === activeCast.id) {
-          dataTree.children = dataTree._children
-          dataTree._children = null
-        } else {
-          dataTree._children = dataTree.children
-          dataTree.children = null
+    _printSnapshotOfOpenNodes (dataTree, activeCast) {
+      if (dataTree.instanceId === activeCast.id) {
+        if (!this.isOpenNode(dataTree)) {
+          this.openNode(dataTree)
         }
+      }
 
+      if (this.hasChildrenNode(dataTree) && !isEmpty(activeCast.children) && !isEmpty(dataTree.children)) {
         for (let child of dataTree.children) {
-          for (let activeChild of activeCast.children) {
-            if (child.childrenExist && child.children !== null) {
-              this._execActiveCast(child, activeChild)
-            }
+          for (let childActiveCast of activeCast.children) {
+            this._printSnapshotOfOpenNodes(child, childActiveCast)
           }
         }
       }
     },
 
     // методы - обработки событий
+
+    /**
+     * @package lodash
+     * @param e
+     * @param index
+     * @param node
+     */
     toggleNode (e, index, node) {
       if ((this.clickableDefaultNodes || node.deep >= this.deep) && node.childrenExist && !isEmpty(node.parent)) {
         let dataNode = this.searchNode(this.innerData, node.id)
         if (dataNode.children !== null) {
           this.tmp.automargin.counter[dataNode.deep + 1] -= dataNode.children.length
-          dataNode._children = dataNode.children
-          dataNode.children = null
+          this.closeNode(dataNode)
         } else {
           this.tmp.automargin.counter[dataNode.deep + 1] += dataNode._children.length
-          dataNode.children = dataNode._children
-          dataNode._children = null
+          this.openNode(dataNode)
         }
+
         this.update()
         this.$nextTick(() => {
           if (!this.dataIsEmpty && !this.dataNotChildren) {
@@ -464,29 +550,37 @@ export default {
       e.stopPropagation()
       this.$emit('onClickNode', e, index, node)
     },
+
     mouseMoveNode (e, index, node) {
       this.$emit('mouseMoveNode', e, index, node)
     },
+
     mouseOverNode (e, index, node) {
       this.$emit('mouseOverNode', e, index, node)
     },
+
     mouseOutNode (e, index, node) {
       this.$emit('mouseOutNode', e, index, node)
     },
+
     onDblClickNode (e, index, node) {
       e.stopPropagation()
       this.$emit('onDblClickNode', e, index, node)
     },
+
     contextMenuNode (e, index, node) {
       e.stopPropagation()
       this.$emit('contextMenuNode', e, index, node)
     },
+
     clickSpace (e) {
       this.$emit('clickSpace', e)
     },
+
     onDblClickSpace (e) {
       this.$emit('onDblClickSpace', e)
     },
+
     contextMenuSpace (e) {
       this.$emit('contextMenuSpace', e)
     }
@@ -501,6 +595,7 @@ export default {
       }
       return null
     },
+
     nodes () {
       if (!this.dataIsEmpty && this.root) {
         this.depth = 0
@@ -549,6 +644,7 @@ export default {
         })
       }
     },
+
     links () {
       if (!this.dataIsEmpty && this.root) {
         return this.root.descendants().slice(1).map((d) => {
@@ -568,6 +664,7 @@ export default {
         })
       }
     },
+
     lines () {
       if (!this.dataIsEmpty && typeof this.innerData.children !== 'undefined' && this.$refs.main && this.grid) {
         let mainEl = d3.select(this.$refs.main)
@@ -611,15 +708,19 @@ export default {
       }
       return []
     },
+
     layout () {
       return layout[this.layoutType]
     },
+
     dataIsEmpty () {
       return isEmpty(this.innerData)
     },
+
     dataNotChildren () {
       return typeof this.innerData.children === 'undefined'
     },
+
     diameter () {
       return this.radius * 2
     }

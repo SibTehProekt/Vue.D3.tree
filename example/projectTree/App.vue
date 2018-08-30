@@ -121,8 +121,8 @@
             <div class="form-group">
               <label for="velocity" class="control-label col-sm-16">Active cast</label>
               <div class="col-sm-16">
-                <button class="btn btn-primary" @click="genActiveCast()">gen</button>
-                <button class="btn btn-warning" @click="execActiveCast()">exec</button>
+                <button class="btn btn-primary" @click="createSnapshotOfOpenNodes()">gen</button>
+                <button class="btn btn-warning" @click="printSnapshotOfOpenNodes()">exec</button>
               </div>
             </div>
 
@@ -256,13 +256,13 @@ export default {
     getId (node) {
       return node.id
     },
-    execActiveCast () {
+    printSnapshotOfOpenNodes () {
       console.log('exec')
-      this.$refs.tree.execActiveCast()
+      this.$refs.tree.printSnapshotOfOpenNodes()
     },
-    genActiveCast () {
+    createSnapshotOfOpenNodes () {
       console.log('gen')
-      this.$refs.tree.genActiveCast()
+      this.$refs.tree.createSnapshotOfOpenNodes()
     },
     expandAll () {
       this.do('expandAll')
