@@ -48,7 +48,7 @@ import euclidean from './euclidean-layout'
 import circular from './circular-layout'
 import {compareString, toPromise, translate} from './d3-utils'
 import * as d3 from 'd3'
-import {isEmpty, cloneDeep} from 'lodash'
+import {isEmpty, cloneDeep, isNumber, toNumber} from 'lodash'
 
 const layout = {
   euclidean,
@@ -200,15 +200,12 @@ export default {
       },
       history: {
         nodes: [],
-        zoom: {
-          x: 0,
-          y: 0,
-          scale: 1
-        }
+        zoom: []
       },
       snapshotOpenNodes: {}
     }
   },
+
   beforeMount () {
     if (!this.dataIsEmpty && typeof this.innerData.children !== 'undefined') {
       // Добавление нужных полей и т.д.
@@ -216,11 +213,13 @@ export default {
       this.addFields(this.innerData)
     }
   },
+
   updated: function () {
     this.$nextTick(function () {
       this.updateLines()
     })
   },
+
   /**
    * @package d3
    */
@@ -293,20 +292,22 @@ export default {
       this.tmp.lines = this.lines
     },
 
-    upgrade () {
+    upgrade (isZoom = false, durationZoom = null) {
       this.innerData = cloneDeep(this.data)
       this.cleanTmpAutoMarginCounter()
       this.addFields(this.innerData)
       this.update()
 
-      this.$nextTick().then(() => {
-        this.$nextTick(() => {
-          if (!this.dataIsEmpty && !this.dataNotChildren) {
-            this.computeZoom()
-          }
-          this.resetZoom()
+      if (isZoom) {
+        this.$nextTick().then(() => {
+          this.$nextTick(() => {
+            if (!this.dataIsEmpty && !this.dataNotChildren) {
+              this.computeZoom()
+            }
+            this.resetZoom(durationZoom)
+          })
         })
-      })
+      }
     },
 
     /**
@@ -406,14 +407,19 @@ export default {
       }
     },
 
-    resetZoom () {
+    resetZoom (duration = null) {
       if (!this.zoomable) {
         return Promise.resolve(false)
       }
+
+      if (!isNumber(duration)) {
+        duration = this.duration
+      }
+
       const svg = d3.select(this.$refs.svgTree)
       let zoom = d3.zoom().scaleExtent([this.zoomMin, this.zoomMax]).on('zoom', this.zoomed(svg.select('g')))
       const transitionPromise = toPromise(
-        svg.transition().duration(this.duration).call(zoom.transform, () => {
+        svg.transition().duration(duration).call(zoom.transform, () => {
           return !this.dataIsEmpty && !this.dataNotChildren ? this.getDefaultZoom() : d3.zoomIdentity
         })
       )
@@ -500,12 +506,17 @@ export default {
       }
     },
 
-    printSnapshotOfOpenNodes () {
-      this.upgrade()
-      this._printSnapshotOfOpenNodes(this.innerData, this.snapshotOpenNodes)
+    printSnapshotOfOpenNodes (zoomPosition, durationZoom = 0) {
+      Promise.resolve().then(() => {
+        this._printSnapshotOfOpenNodes(this.innerData, this.snapshotOpenNodes)
+      }).then(() => {
+        this.cleanTmpAutoMarginCounter()
+      }).then(() => {
+        this.culcAutomarginDeem(this.innerData)
+      })
     },
 
-    _printSnapshotOfOpenNodes (dataTree, activeCast) {
+    _printSnapshotOfOpenNodes (dataTree, activeCast, deep = 0) {
       if (dataTree.instanceId === activeCast.id) {
         if (!this.isOpenNode(dataTree)) {
           this.openNode(dataTree)
@@ -515,10 +526,80 @@ export default {
       if (this.hasChildrenNode(dataTree) && !isEmpty(activeCast.children) && !isEmpty(dataTree.children)) {
         for (let child of dataTree.children) {
           for (let childActiveCast of activeCast.children) {
-            this._printSnapshotOfOpenNodes(child, childActiveCast)
+            this._printSnapshotOfOpenNodes(child, childActiveCast, deep)
           }
         }
       }
+    },
+
+    getZoomPosition () {
+      let tmp = d3.select(this.$refs.main).attr('transform').match(/[\d.]+/g)
+      return {
+        x: toNumber(tmp[0]),
+        y: toNumber(tmp[1]),
+        scale: toNumber(tmp[2])
+      }
+    },
+
+    culcAutomarginDeem (dataNode, deep = 0) {
+      if (typeof this.tmp.automargin.counter[deep] === 'undefined') {
+        this.tmp.automargin.counter[deep] = 0
+      }
+
+      if (deep === 0) {
+        this.tmp.automargin.counter[deep]++
+      }
+
+      if (typeof dataNode.children !== 'undefined' && !isEmpty(dataNode.children)) {
+        deep++
+
+        if (typeof this.tmp.automargin.counter[deep] === 'undefined') {
+          this.tmp.automargin.counter[deep] = 0
+        }
+
+        for (let child of dataNode.children) {
+          // коунтирвание для просчета маргина
+          this.tmp.automargin.counter[deep]++
+          this.culcAutomarginDeem(child, deep)
+        }
+      }
+    },
+
+    /**
+     * Установка позиции
+     */
+    setZoomPosition (zoomPosition, duration = 0) {
+      console.log(this.isZoomPositioObject(zoomPosition))
+      if (!this.zoomable || !this.isZoomPositioObject(zoomPosition)) {
+        return Promise.resolve(false)
+      }
+
+      this.zoomPositionValidScale(zoomPosition)
+
+      if (!isNumber(duration)) duration = 0
+
+      const svg = d3.select(this.$refs.svgTree)
+      let zoom = d3.zoom().scaleExtent([this.zoomMin, this.zoomMax]).on('zoom', this.zoomed(svg.select('g')))
+      const transitionPromise = toPromise(
+        svg.transition().duration(duration).call(zoom.transform, () => {
+          return d3.zoomIdentity.translate(zoomPosition.x, zoomPosition.y).scale(zoomPosition.scale)
+        })
+      )
+      return transitionPromise.then(() => true)
+    },
+
+    zoomPositionValidScale (zoomPosition) {
+      if (zoomPosition.scale < this.zoomMin) {
+        zoomPosition.scale = this.zoomMin
+      } else if (zoomPosition.scale > this.zoomMax) {
+        zoomPosition.scale = this.zoomMax
+      }
+    },
+
+    isZoomPositioObject (zoomPosition) {
+      return (typeof zoomPosition.x !== 'undefined' && isNumber(zoomPosition.x) &&
+        typeof zoomPosition.y !== 'undefined' && isNumber(zoomPosition.y) &&
+        typeof zoomPosition.scale !== 'undefined' && isNumber(zoomPosition.scale))
     },
 
     // методы - обработки событий
@@ -728,8 +809,12 @@ export default {
 
   watch: {
     data (current, old) {
-      this.upgrade()
-      // this.onData(current)
+      this.createSnapshotOfOpenNodes()
+      this.innerData = cloneDeep(this.data)
+      this.cleanTmpAutoMarginCounter()
+      this.addFields(this.innerData)
+      this.printSnapshotOfOpenNodes()
+      // this.printSnapshotOfOpenNodes()
     },
 
     type () {

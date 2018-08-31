@@ -126,6 +126,14 @@
               </div>
             </div>
 
+            <div class="form-group">
+              <label for="velocity" class="control-label col-sm-16">Transform</label>
+              <div class="col-sm-16">
+                <button class="btn btn-primary" @click="getZoomPosition()">Save transform</button>
+                <button class="btn btn-primary" @click="setZoomPosition()">Load transform</button>
+              </div>
+            </div>
+
         </div>
       </div>
     </div>
@@ -212,7 +220,8 @@ export default {
       counter: false,
       data: null,
       dataCheck: '1',
-      showToolbar: true
+      showToolbar: true,
+      transform: {}
     }
   },
   beforeMount () {
@@ -258,11 +267,18 @@ export default {
     },
     printSnapshotOfOpenNodes () {
       console.log('exec')
-      this.$refs.tree.printSnapshotOfOpenNodes()
+      this.$refs.tree.printSnapshotOfOpenNodes(this.transform)
     },
     createSnapshotOfOpenNodes () {
       console.log('gen')
+      this.getZoomPosition()
       this.$refs.tree.createSnapshotOfOpenNodes()
+    },
+    getZoomPosition () {
+      this.transform = this.$refs.tree.getZoomPosition()
+    },
+    setZoomPosition () {
+      this.$refs.tree.setZoomPosition(this.transform)
     },
     expandAll () {
       this.do('expandAll')
